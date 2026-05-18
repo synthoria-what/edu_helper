@@ -1,0 +1,46 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -e
+            cd "${{ secrets.DEPLOY_PATH }}"
+            git fetch origin
+            git checkout "${{ secrets.DEPLOY_BRANCH || 'main' }}"
+            git pull origin "${{ secrets.DEPLOY_BRANCH || 'main' }}"
+
+            python3 -m venv backend/.venv
+            . backend/.venv/bin/activate
+            pip install --upgrade pip
+            pip install -r backend/requirements.txt
+            deactivate
+
+            cd frontend
+            npm ci
+            npm run build
+            cd ..
+
+            sudo systemctl restart "${{ secrets.BACKEND_SERVICE_NAME }}"
+            sudo systemctl status "${{ secrets.BACKEND_SERVICE_NAME }}" --no-pager
+
+            if [ -n "${{ secrets.FRONTEND_SERVICE_NAME }}" ]; then
+              sudo systemctl restart "${{ secrets.FRONTEND_SERVICE_NAME }}"
+              sudo systemctl status "${{ secrets.FRONTEND_SERVICE_NAME }}" --no-pager
+            fi
