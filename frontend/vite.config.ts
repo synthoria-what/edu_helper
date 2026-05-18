@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   preview: {
-    allowedHosts: ["eduhelper.synthori.space"],
+    allowedHosts: ["eduhelper.synthori.space", "frontend"],
   },
   server: {
     port: 5173,
