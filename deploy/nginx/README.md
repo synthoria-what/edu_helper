@@ -21,9 +21,7 @@ sudo systemctl reload nginx
 Minimal production `.env`:
 
 ```env
-POSTGRES_DB=edu_helper
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=strong-password
+DATABASE_URL=postgresql+asyncpg://edu_helper_user:strong-password@ru.synthori.space:5432/edu_helper
 JWT_SECRET_KEY=super-secret-key
 CORS_ORIGINS=https://eduhelper.synthori.space
 BACKEND_HOST=127.0.0.1

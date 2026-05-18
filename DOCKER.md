@@ -4,6 +4,7 @@ Minimal start:
 
 ```bash
 cp .env.example .env
+# Edit DATABASE_URL in .env before starting.
 docker compose up -d --build
 docker compose ps
 ```
@@ -35,6 +36,7 @@ FRONTEND_PORT=8080
 Useful checks on the server:
 
 ```bash
+docker compose config
 curl http://127.0.0.1:8080/
 curl http://127.0.0.1:8000/health
 docker compose logs -f backend
