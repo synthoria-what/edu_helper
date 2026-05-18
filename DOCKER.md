@@ -5,26 +5,32 @@ Minimal start:
 ```bash
 cp .env.example .env
 # Edit DB_PASSWORD in .env before starting.
+docker network create proxy-network
 docker compose up -d --build
 docker compose ps
 ```
 
-By default Docker publishes only local ports for the host nginx:
+The app joins the external Docker network `proxy-network`, so an nginx container on the same network can proxy to:
 
-- frontend: `127.0.0.1:8080`
-- backend: `127.0.0.1:8000`
+- frontend: `http://frontend:4173`
+- backend: `http://backend:8000`
 
-The frontend image does not include nginx. It builds the React app and serves it with Vite preview. Configure the host nginx to proxy routes separately:
+The frontend image does not include nginx. It builds the React app and serves it with Vite preview. Configure the nginx container like this:
 
 ```nginx
 location /api/ {
-  proxy_pass http://127.0.0.1:8000/;
+  proxy_pass http://backend:8000/;
 }
 
 location / {
-  proxy_pass http://127.0.0.1:8080;
+  proxy_pass http://frontend:4173;
 }
 ```
+
+The compose file also publishes local host ports for debugging:
+
+- frontend: `127.0.0.1:8080`
+- backend: `127.0.0.1:8000`
 
 For a temporary direct frontend check from another machine, set this in `.env` before starting:
 
