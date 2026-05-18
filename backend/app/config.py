@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "EduHelper API"
-    database_url: str = "postgresql+asyncpg://edu_helper_user:kuWFdmUhnAyYUFMX@ru.synthori.space:5432/edu_helper"
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/edu_helper"
     jwt_secret_key: str = "change-me-for-production"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 120
