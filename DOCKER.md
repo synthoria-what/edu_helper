@@ -4,7 +4,7 @@ Minimal start:
 
 ```bash
 cp .env.example .env
-# Edit DATABASE_URL in .env before starting.
+# Edit DB_PASSWORD in .env before starting.
 docker compose up -d --build
 docker compose ps
 ```

@@ -5,7 +5,7 @@ services:
     container_name: edu_helper_backend
     environment:
       APP_NAME: ${APP_NAME:-EduHelper API}
-      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${DB_USER:-edu_helper_user}:${DB_PASSWORD:?Set DB_PASSWORD or DATABASE_URL in .env}@${DB_HOST:-ru.synthori.space}:${DB_PORT:-5432}/${DB_NAME:-edu_helper}}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-for-production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-120}
