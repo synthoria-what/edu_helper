@@ -12,7 +12,7 @@ type Point = {
 
 type InteractiveTaskProps = {
   task: Task;
-  onSolved: () => Promise<void>;
+  onSolved: (isCorrect: boolean) => Promise<void>;
 };
 
 export function InteractiveTask({ task, onSolved }: InteractiveTaskProps) {
@@ -24,11 +24,15 @@ export function InteractiveTask({ task, onSolved }: InteractiveTaskProps) {
     const rawOptions = task.payload.options;
     return Array.isArray(rawOptions) ? rawOptions.map(String) : [];
   }, [task.payload.options]);
+  const optionsKey = options.join("\u0001");
+  const shuffledOptions = useMemo(() => shuffleItems(options), [task.id, optionsKey]);
 
   const points = useMemo(() => {
     const rawPoints = task.payload.points;
     return Array.isArray(rawPoints) ? (rawPoints as Point[]) : [];
   }, [task.payload.points]);
+  const pointsKey = points.map((point) => `${point.label}:${point.value}`).join("\u0001");
+  const shuffledAnswerPoints = useMemo(() => shuffleItems(points), [task.id, pointsKey]);
 
   async function submit(nextAnswer = answer) {
     setIsSubmitting(true);
@@ -36,7 +40,7 @@ export function InteractiveTask({ task, onSolved }: InteractiveTaskProps) {
       const response = await api.submitTask(task.id, nextAnswer);
       setAnswer(nextAnswer);
       setStatus(response.message);
-      await onSolved();
+      await onSolved(response.result.is_correct);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Не удалось отправить ответ");
     } finally {
@@ -62,11 +66,11 @@ export function InteractiveTask({ task, onSolved }: InteractiveTaskProps) {
 
       {task.type === "quiz" && (
         <div className="option-grid">
-          {options.map((option) => (
+          {shuffledOptions.map((option, index) => (
             <button
               className={answer === option ? "option-button option-button--active" : "option-button"}
               disabled={isSubmitting}
-              key={option}
+              key={`${option}-${index}`}
               type="button"
               onClick={() => void submit(option)}
             >
@@ -90,11 +94,11 @@ export function InteractiveTask({ task, onSolved }: InteractiveTaskProps) {
             </ResponsiveContainer>
           </div>
           <div className="chart-choice-grid">
-            {points.map((point) => (
+            {shuffledAnswerPoints.map((point, index) => (
               <button
                 className={answer === point.label ? "option-button option-button--active" : "option-button"}
                 disabled={isSubmitting}
-                key={point.label}
+                key={`${point.label}-${index}`}
                 type="button"
                 onClick={() => void submit(point.label)}
               >
@@ -128,6 +132,15 @@ export function InteractiveTask({ task, onSolved }: InteractiveTaskProps) {
       )}
     </section>
   );
+}
+
+function shuffleItems<T>(items: T[]): T[] {
+  const result = [...items];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [result[index], result[randomIndex]] = [result[randomIndex], result[index]];
+  }
+  return result;
 }
 
 function AnswerForm({

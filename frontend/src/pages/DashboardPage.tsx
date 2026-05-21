@@ -5,19 +5,24 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { Layout } from "../components/Layout";
-import type { CourseListItem, ProgressSummary } from "../types";
+import { formatTaskCount } from "../format";
+import type { Certificate, CompletedTask, CourseListItem, ProgressSummary } from "../types";
 
 export function DashboardPage() {
   const { user } = useAuth();
   const [courses, setCourses] = useState<CourseListItem[]>([]);
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
+  const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const [completedTasks, setCompletedTasks] = useState<CompletedTask[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    Promise.all([api.courses(), api.progress()])
-      .then(([coursesResponse, progressResponse]) => {
+    Promise.all([api.courses(), api.progress(), api.certificates(), api.completedTasks()])
+      .then(([coursesResponse, progressResponse, certificateResponse, completedTaskResponse]) => {
         setCourses(coursesResponse);
         setSummary(progressResponse);
+        setCertificates(certificateResponse);
+        setCompletedTasks(completedTaskResponse);
       })
       .catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Не удалось загрузить данные"));
   }, []);
@@ -69,7 +74,7 @@ export function DashboardPage() {
                   {course.duration_minutes} мин.
                 </span>
                 <span>
-                  {course.completed_tasks}/{course.total_tasks} заданий
+                  {course.completed_tasks}/{formatTaskCount(course.total_tasks)}
                 </span>
               </div>
               <Link className="secondary-button" to={`/courses/${course.id}`}>
@@ -78,6 +83,52 @@ export function DashboardPage() {
               </Link>
             </article>
           ))}
+        </div>
+      </section>
+
+      <section className="content-section progress-history-section">
+        <div className="history-column">
+          <div className="section-heading">
+            <h2>Сертификаты</h2>
+            <span>{certificates.length}</span>
+          </div>
+          <div className="history-list">
+            {certificates.length ? (
+              certificates.map((certificate) => (
+                <Link className="history-item" key={certificate.id} to={`/courses/${certificate.course_id}/certificate`}>
+                  <strong>{certificate.course_title}</strong>
+                  <span>{certificate.code}</span>
+                  <small>
+                    {certificate.student_name} · {new Date(certificate.issued_at).toLocaleDateString("ru-RU")}
+                  </small>
+                </Link>
+              ))
+            ) : (
+              <p className="helper-text">Здесь появятся сертификаты после завершения курсов.</p>
+            )}
+          </div>
+        </div>
+        <div className="history-column">
+          <div className="section-heading">
+            <h2>Выполненные задания</h2>
+            <span>{completedTasks.length}</span>
+          </div>
+          <div className="history-list">
+            {completedTasks.length ? (
+              completedTasks.slice(0, 8).map((task) => (
+                <Link className="history-item" key={`${task.user_id}-${task.task_id}`} to={`/courses/${task.course_id}`}>
+                  <strong>{task.task_title}</strong>
+                  <span>{task.course_title} · {task.lesson_title}</span>
+                  <small>
+                    {user?.role !== "student" ? `${task.student_name} · ` : ""}
+                    {new Date(task.completed_at).toLocaleDateString("ru-RU")}
+                  </small>
+                </Link>
+              ))
+            ) : (
+              <p className="helper-text">После правильных ответов здесь будет история выполненных заданий.</p>
+            )}
+          </div>
         </div>
       </section>
     </Layout>

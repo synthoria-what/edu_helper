@@ -79,6 +79,20 @@ export type ProgressSummary = {
   average_progress: number;
 };
 
+export type CompletedTask = {
+  task_id: number;
+  task_title: string;
+  course_id: number;
+  course_title: string;
+  lesson_title: string;
+  answer: string;
+  score: number;
+  completed_at: string;
+  user_id: string;
+  student_name: string;
+  student_email: string;
+};
+
 export type CourseMutation = {
   title: string;
   description: string;
@@ -114,6 +128,7 @@ export type StudentProgress = {
   total_tasks: number;
   progress_percent: number;
   certificate_code: string | null;
+  completed_task_titles: string[];
 };
 
 export type AdminUser = User & {

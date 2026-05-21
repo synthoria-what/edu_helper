@@ -1,9 +1,23 @@
-import { BarChart3, BookPlus, Image, ListChecks, Plus, Save, Trash2, UsersRound, Video } from "lucide-react";
+import {
+  BarChart3,
+  BookPlus,
+  CheckCircle2,
+  Image,
+  Lightbulb,
+  ListChecks,
+  Pencil,
+  Plus,
+  Save,
+  Trash2,
+  UsersRound,
+  Video,
+} from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { Layout } from "../components/Layout";
+import { formatTaskCount } from "../format";
 import type {
   CourseDetail,
   CourseListItem,
@@ -18,6 +32,8 @@ type ChartPoint = {
   label: string;
   value: number;
 };
+
+type ManagerPanel = "lessons" | "tasks" | "progress";
 
 const emptyCourse: CourseMutation = {
   title: "",
@@ -46,23 +62,70 @@ export function TeacherPage() {
   const [lessonForm, setLessonForm] = useState<LessonMutation>(emptyLesson);
   const [taskForm, setTaskForm] = useState(defaultTaskForm());
   const [selectedLessonId, setSelectedLessonId] = useState<number | null>(null);
+  const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
+  const [isLessonFormOpen, setIsLessonFormOpen] = useState(false);
   const [message, setMessage] = useState("");
+  const [isCourseFormOpen, setIsCourseFormOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState<ManagerPanel>("lessons");
 
   const canEdit = user?.role === "teacher" || user?.role === "admin";
 
-  async function loadCourses() {
+  async function loadCourses(preferredCourseId?: number | null) {
     const loadedCourses = await api.courses();
     setCourses(loadedCourses);
-    if (!selectedCourseId && loadedCourses[0]) {
-      setSelectedCourseId(loadedCourses[0].id);
+    if (preferredCourseId !== undefined) {
+      setSelectedCourseId(preferredCourseId ?? null);
     }
+  }
+
+  function notify(text: string) {
+    setMessage(text);
+  }
+
+  function openNewCourseForm() {
+    setSelectedCourseId(null);
+    setCourseDetail(null);
+    setStudents([]);
+    setCourseForm(emptyCourse);
+    setSelectedLessonId(null);
+    setEditingLessonId(null);
+    setIsLessonFormOpen(false);
+    setLessonForm(emptyLesson);
+    setTaskForm(defaultTaskForm());
+    setIsCourseFormOpen(true);
+  }
+
+  function selectCourse(courseId: number) {
+    setSelectedCourseId(courseId);
+    setIsCourseFormOpen(false);
+    setActivePanel("lessons");
+    setEditingLessonId(null);
+    setIsLessonFormOpen(false);
+  }
+
+  function closeCourseForm() {
+    if (courseDetail) {
+      setCourseForm({
+        title: courseDetail.title,
+        description: courseDetail.description,
+        direction: courseDetail.direction,
+        level: courseDetail.level,
+        duration_minutes: courseDetail.duration_minutes,
+        image_url: courseDetail.image_url ?? "",
+      });
+    } else {
+      setCourseForm(emptyCourse);
+    }
+    setIsCourseFormOpen(false);
   }
 
   async function loadCourse(courseId: number) {
     const [detail, progress] = await Promise.all([api.course(String(courseId)), api.courseStudents(courseId)]);
     setCourseDetail(detail);
     setStudents(progress);
-    setSelectedLessonId((currentLessonId) => currentLessonId ?? detail.lessons[0]?.id ?? null);
+    setSelectedLessonId((currentLessonId) =>
+      detail.lessons.some((lesson) => lesson.id === currentLessonId) ? currentLessonId : detail.lessons[0]?.id ?? null,
+    );
     setCourseForm({
       title: detail.title,
       description: detail.description,
@@ -74,17 +137,50 @@ export function TeacherPage() {
     setLessonForm({ ...emptyLesson, order_index: detail.lessons.length + 1 });
   }
 
+  function openNewLessonForm() {
+    setEditingLessonId(null);
+    setLessonForm({ ...emptyLesson, order_index: (courseDetail?.lessons.length ?? 0) + 1 });
+    setIsLessonFormOpen(true);
+  }
+
+  function editLesson(lessonId: number) {
+    const lesson = courseDetail?.lessons.find((item) => item.id === lessonId);
+    if (!lesson) return;
+    setSelectedLessonId(lesson.id);
+    setEditingLessonId(lesson.id);
+    setIsLessonFormOpen(true);
+    setLessonForm({
+      title: lesson.title,
+      content: lesson.content,
+      video_url: lesson.video_url ?? "",
+      image_url: lesson.image_url ?? "",
+      order_index: lesson.order_index,
+    });
+  }
+
+  function cancelLessonEdit() {
+    setEditingLessonId(null);
+    setIsLessonFormOpen(false);
+    setLessonForm({ ...emptyLesson, order_index: (courseDetail?.lessons.length ?? 0) + 1 });
+  }
+
   useEffect(() => {
-    void loadCourses().catch((error) => setMessage(error instanceof Error ? error.message : "Не удалось загрузить курсы"));
+    void loadCourses().catch((error) => notify(error instanceof Error ? error.message : "Не удалось загрузить курсы"));
   }, []);
 
   useEffect(() => {
     if (selectedCourseId) {
       void loadCourse(selectedCourseId).catch((error) =>
-        setMessage(error instanceof Error ? error.message : "Не удалось загрузить курс"),
+        notify(error instanceof Error ? error.message : "Не удалось загрузить курс"),
       );
     }
   }, [selectedCourseId]);
+
+  useEffect(() => {
+    if (!message) return;
+    const timerId = window.setTimeout(() => setMessage(""), 4200);
+    return () => window.clearTimeout(timerId);
+  }, [message]);
 
   const totalProgress = useMemo(() => {
     if (!students.length) return 0;
@@ -105,31 +201,44 @@ export function TeacherPage() {
       let targetCourseId = selectedCourseId;
       if (selectedCourseId) {
         await api.updateCourse(selectedCourseId, normalizeCourse(courseForm));
-        setMessage("Курс обновлен");
+        notify("Курс обновлен");
       } else {
         const created = await api.createCourse(normalizeCourse(courseForm));
         targetCourseId = created.id;
         setSelectedCourseId(created.id);
-        setMessage("Курс создан");
+        notify("Курс создан");
       }
-      await loadCourses();
+      await loadCourses(targetCourseId);
       if (targetCourseId) await loadCourse(targetCourseId);
+      setIsCourseFormOpen(false);
+      setActivePanel("lessons");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось сохранить курс");
+      notify(error instanceof Error ? error.message : "Не удалось сохранить курс");
     }
   }
 
-  async function createLesson(event: FormEvent) {
+  async function saveLesson(event: FormEvent) {
     event.preventDefault();
     if (!selectedCourseId) return;
     try {
-      const created = await api.createLesson(selectedCourseId, normalizeLesson(lessonForm));
-      setLessonForm({ ...emptyLesson, order_index: lessonForm.order_index + 1 });
-      await loadCourse(selectedCourseId);
-      setSelectedLessonId(created.id);
-      setMessage("Урок добавлен");
+      if (editingLessonId) {
+        const updated = await api.updateLesson(editingLessonId, normalizeLesson(lessonForm));
+        await loadCourse(selectedCourseId);
+        setSelectedLessonId(updated.id);
+        setEditingLessonId(null);
+        setIsLessonFormOpen(false);
+        notify("Урок обновлен");
+      } else {
+        const created = await api.createLesson(selectedCourseId, normalizeLesson(lessonForm));
+        setLessonForm({ ...emptyLesson, order_index: lessonForm.order_index + 1 });
+        await loadCourse(selectedCourseId);
+        setSelectedLessonId(created.id);
+        setIsLessonFormOpen(false);
+        setActivePanel("tasks");
+        notify("Урок добавлен. Теперь можно добавить задание к нему");
+      }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось добавить урок");
+      notify(error instanceof Error ? error.message : "Не удалось сохранить урок");
     }
   }
 
@@ -140,9 +249,9 @@ export function TeacherPage() {
       await api.createTask(selectedLessonId, normalizeTask(taskForm));
       setTaskForm(defaultTaskForm(taskForm.order_index + 1, taskForm.type));
       await loadCourse(selectedCourseId);
-      setMessage("Задание добавлено");
+      notify("Задание добавлено");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось добавить задание");
+      notify(error instanceof Error ? error.message : "Не удалось добавить задание");
     }
   }
 
@@ -157,12 +266,15 @@ export function TeacherPage() {
       setCourseDetail(null);
       setStudents([]);
       setSelectedLessonId(null);
+      setEditingLessonId(null);
+      setIsLessonFormOpen(false);
       setCourseForm(emptyCourse);
       setLessonForm(emptyLesson);
-      setMessage("Курс удален");
-      await loadCourses();
+      setIsCourseFormOpen(false);
+      notify("Курс удален");
+      await loadCourses(null);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось удалить курс");
+      notify(error instanceof Error ? error.message : "Не удалось удалить курс");
     }
   }
 
@@ -181,226 +293,353 @@ export function TeacherPage() {
         </div>
       </section>
 
-      {message && <div className="teacher-message">{message}</div>}
-
-      <section className="teacher-grid">
-        <div className="teacher-panel">
-          <div className="section-heading">
-            <h2>Курсы</h2>
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={() => {
-                setSelectedCourseId(null);
-                setCourseDetail(null);
-                setStudents([]);
-                setCourseForm(emptyCourse);
-                setSelectedLessonId(null);
-              }}
-            >
-              <BookPlus size={18} />
-              Новый
-            </button>
-          </div>
-          <div className="teacher-list">
-            {courses.map((course) => (
-              <button
-                className={course.id === selectedCourseId ? "teacher-list-item active" : "teacher-list-item"}
-                key={course.id}
-                type="button"
-                onClick={() => setSelectedCourseId(course.id)}
-              >
-                <strong>{course.title}</strong>
-                <span>{course.total_tasks} заданий</span>
-              </button>
-            ))}
-          </div>
+      {message && (
+        <div className="teacher-toast">
+          <CheckCircle2 size={18} />
+          <span>{message}</span>
         </div>
+      )}
 
-        <form className="teacher-panel teacher-form" onSubmit={saveCourse}>
-          <PanelTitle icon={<Save size={20} />} title={selectedCourseId ? "Редактировать курс" : "Новый курс"} />
-          <Field label="Название" value={courseForm.title} onChange={(value) => setCourseForm({ ...courseForm, title: value })} />
-          <Textarea
-            label="Описание"
-            value={courseForm.description}
-            onChange={(value) => setCourseForm({ ...courseForm, description: value })}
-          />
-          <div className="form-row">
-            <Field
-              label="Направление"
-              value={courseForm.direction}
-              onChange={(value) => setCourseForm({ ...courseForm, direction: value })}
-            />
-            <Field label="Уровень" value={courseForm.level} onChange={(value) => setCourseForm({ ...courseForm, level: value })} />
-          </div>
-          <div className="form-row">
-            <Field
-              label="Минут"
-              type="number"
-              value={String(courseForm.duration_minutes)}
-              onChange={(value) => setCourseForm({ ...courseForm, duration_minutes: Number(value) })}
-            />
-            <Field
-              label="Картинка курса"
-              value={courseForm.image_url ?? ""}
-              onChange={(value) => setCourseForm({ ...courseForm, image_url: value })}
-              icon={<Image size={16} />}
-              required={false}
-            />
-          </div>
-          <button className="primary-button" type="submit">
-            <Save size={18} />
-            Сохранить курс
-          </button>
-          {selectedCourseId && (
-            <button className="danger-button" type="button" onClick={deleteSelectedCourse}>
-              <Trash2 size={18} />
-              Удалить курс
-            </button>
-          )}
-        </form>
-
-        <form className="teacher-panel teacher-form" onSubmit={createLesson}>
-          <PanelTitle icon={<Video size={20} />} title="Добавить урок" />
-          {!selectedCourseId && <p className="helper-text">Сначала создайте или выберите курс слева.</p>}
-          <Field label="Название урока" value={lessonForm.title} onChange={(value) => setLessonForm({ ...lessonForm, title: value })} />
-          <Textarea
-            label="Описание и теория"
-            value={lessonForm.content}
-            onChange={(value) => setLessonForm({ ...lessonForm, content: value })}
-          />
-          <div className="form-row">
-            <Field
-              label="Видео-ссылка"
-              value={lessonForm.video_url ?? ""}
-              onChange={(value) => setLessonForm({ ...lessonForm, video_url: value })}
-              icon={<Video size={16} />}
-              required={false}
-            />
-            <Field
-              label="Картинка урока"
-              value={lessonForm.image_url ?? ""}
-              onChange={(value) => setLessonForm({ ...lessonForm, image_url: value })}
-              icon={<Image size={16} />}
-              required={false}
-            />
-          </div>
-          <Field
-            label="Порядок"
-            type="number"
-            value={String(lessonForm.order_index)}
-            onChange={(value) => setLessonForm({ ...lessonForm, order_index: Number(value) })}
-          />
-          <button className="primary-button" type="submit" disabled={!selectedCourseId}>
-            <BookPlus size={18} />
-            Добавить урок
-          </button>
-        </form>
-
-        <form className="teacher-panel teacher-form task-builder" onSubmit={createTask}>
-          <PanelTitle icon={<ListChecks size={20} />} title="Добавить задание" />
-          <p className="helper-text">
-            Задания показываются ученику по порядку. Следующее откроется только после правильного ответа.
-          </p>
-
-          <div className="builder-step">
-            <span>1</span>
-            <strong>Куда добавить</strong>
-          </div>
-          <label>
-            Урок
-            <select
-              value={selectedLessonId ?? ""}
-              onChange={(event) => setSelectedLessonId(Number(event.target.value))}
-              required
-            >
-              <option value="" disabled>
-                Выберите урок
-              </option>
-              {courseDetail?.lessons.map((lesson) => (
-                <option key={lesson.id} value={lesson.id}>
-                  {lesson.order_index}. {lesson.title}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="builder-step">
-            <span>2</span>
-            <strong>Тип задания</strong>
-          </div>
-          <div className="task-type-grid">
-            <TaskTypeButton
-              active={taskForm.type === "quiz"}
-              description="Вопрос и несколько вариантов"
-              label="Квиз"
-              onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "quiz"))}
-            />
-            <TaskTypeButton
-              active={taskForm.type === "chart"}
-              description="График, ответ кликом"
-              label="График"
-              onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "chart"))}
-            />
-            <TaskTypeButton
-              active={taskForm.type === "rebus"}
-              description="Ребус и текстовый ответ"
-              label="Ребус"
-              onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "rebus"))}
-            />
-          </div>
-
-          <div className="builder-step">
-            <span>3</span>
-            <strong>Содержание</strong>
-          </div>
-          <Field label="Название" value={taskForm.title} onChange={(value) => setTaskForm({ ...taskForm, title: value })} />
-          <Textarea label="Вопрос для ученика" value={taskForm.prompt} onChange={(value) => setTaskForm({ ...taskForm, prompt: value })} />
-          <TaskPayloadFields taskForm={taskForm} setTaskForm={setTaskForm} />
-
-          <div className="builder-step">
-            <span>4</span>
-            <strong>Дополнительно</strong>
-          </div>
-          <div className="form-row">
-            <Field
-              label="Картинка задания"
-              value={taskForm.image_url ?? ""}
-              onChange={(value) => setTaskForm({ ...taskForm, image_url: value })}
-              icon={<Image size={16} />}
-              required={false}
-            />
-            <Field
-              label="Порядок"
-              type="number"
-              value={String(taskForm.order_index)}
-              onChange={(value) => setTaskForm({ ...taskForm, order_index: Number(value) })}
-            />
-          </div>
-
-          <TaskPreview taskForm={taskForm} />
-
-          <button className="primary-button" type="submit" disabled={!selectedLessonId}>
-            <ListChecks size={18} />
-            Добавить задание
-          </button>
-        </form>
-
-        <div className="teacher-panel progress-panel">
-          <PanelTitle icon={<UsersRound size={20} />} title="Прогресс студентов" />
-          {students.map((student) => (
-            <div className="student-progress" key={student.user_id}>
-              <div>
-                <strong>{student.full_name}</strong>
-                <span>{student.email}</span>
-              </div>
-              <span>{student.progress_percent}%</span>
-              <div className="progress-line">
-                <span style={{ width: `${student.progress_percent}%` }} />
-              </div>
-              {student.certificate_code && <small>Сертификат: {student.certificate_code}</small>}
+      <section className="teacher-workspace">
+        <aside className="teacher-panel course-list-panel">
+          <div className="section-heading">
+            <div>
+              <h2>Курсы</h2>
+              <span>Сначала выберите курс или создайте новый</span>
             </div>
-          ))}
+            <button className="primary-button" type="button" onClick={openNewCourseForm}>
+              <Plus size={18} />
+              Добавить
+            </button>
+          </div>
+
+          <div className="teacher-list">
+            {courses.length ? (
+              courses.map((course) => (
+                <button
+                  className={course.id === selectedCourseId ? "teacher-list-item active" : "teacher-list-item"}
+                  key={course.id}
+                  type="button"
+                  onClick={() => selectCourse(course.id)}
+                >
+                  <strong>{course.title}</strong>
+                  <span>{course.direction}</span>
+                  <small>
+                    {formatTaskCount(course.total_tasks)} · {course.duration_minutes} мин.
+                  </small>
+                </button>
+              ))
+            ) : (
+              <div className="empty-state compact">
+                <BookPlus size={24} />
+                <strong>Курсов пока нет</strong>
+                <span>Нажмите "Добавить", чтобы создать первый курс.</span>
+              </div>
+            )}
+          </div>
+        </aside>
+
+        <div className="teacher-main-panel">
+          {isCourseFormOpen && (
+            <form className="teacher-panel teacher-form course-editor-panel" onSubmit={saveCourse}>
+              <PanelTitle icon={<Save size={20} />} title={selectedCourseId ? "Редактировать курс" : "Новый курс"} />
+              <p className="helper-text">Заполните базовую карточку курса. Уроки и задания появятся отдельными шагами после сохранения.</p>
+              <Field label="Название" value={courseForm.title} onChange={(value) => setCourseForm({ ...courseForm, title: value })} />
+              <Textarea
+                label="Описание"
+                value={courseForm.description}
+                onChange={(value) => setCourseForm({ ...courseForm, description: value })}
+              />
+              <div className="form-row">
+                <Field
+                  label="Направление"
+                  value={courseForm.direction}
+                  onChange={(value) => setCourseForm({ ...courseForm, direction: value })}
+                />
+                <Field label="Уровень" value={courseForm.level} onChange={(value) => setCourseForm({ ...courseForm, level: value })} />
+              </div>
+              <div className="form-row">
+                <Field
+                  label="Минут"
+                  type="number"
+                  value={String(courseForm.duration_minutes)}
+                  onChange={(value) => setCourseForm({ ...courseForm, duration_minutes: Number(value) })}
+                />
+                <Field
+                  label="Картинка курса"
+                  value={courseForm.image_url ?? ""}
+                  onChange={(value) => setCourseForm({ ...courseForm, image_url: value })}
+                  icon={<Image size={16} />}
+                  required={false}
+                />
+              </div>
+              <div className="form-actions">
+                <button className="primary-button" type="submit">
+                  <Save size={18} />
+                  Сохранить курс
+                </button>
+                <button className="secondary-button" type="button" onClick={closeCourseForm}>
+                  Отмена
+                </button>
+              </div>
+            </form>
+          )}
+
+          {!isCourseFormOpen && !courseDetail && (
+            <div className="teacher-panel teacher-start-panel">
+              <PanelTitle icon={<Lightbulb size={20} />} title="С чего начать" />
+              <div className="teacher-steps">
+                <div>
+                  <span>1</span>
+                  <strong>Выберите курс слева</strong>
+                  <p>Откроются отдельные разделы: уроки, задания и прогресс студентов.</p>
+                </div>
+                <div>
+                  <span>2</span>
+                  <strong>Или создайте новый</strong>
+                  <p>Кнопка "Добавить" откроет только форму курса, без лишних полей на экране.</p>
+                </div>
+                <div>
+                  <span>3</span>
+                  <strong>Двигайтесь по шагам</strong>
+                  <p>Сначала урок, затем задания внутри выбранного урока.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!isCourseFormOpen && courseDetail && (
+            <div className="course-manager">
+              <div className="teacher-panel course-manager-header">
+                <div>
+                  <span className="eyebrow">{courseDetail.direction}</span>
+                  <h2>{courseDetail.title}</h2>
+                  <p>{courseDetail.description}</p>
+                </div>
+                <div className="course-manager-actions">
+                  <button className="secondary-button" type="button" onClick={() => setIsCourseFormOpen(true)}>
+                    <Pencil size={18} />
+                    Редактировать
+                  </button>
+                  <button className="danger-button" type="button" onClick={deleteSelectedCourse}>
+                    <Trash2 size={18} />
+                    Удалить
+                  </button>
+                </div>
+                <div className="summary-strip compact">
+                  <SummaryBox icon={<Video size={20} />} label="Уроки" value={courseDetail.lessons.length} />
+                  <SummaryBox icon={<ListChecks size={20} />} label="Задания" value={courseDetail.total_tasks} />
+                  <SummaryBox icon={<UsersRound size={20} />} label="Студенты" value={students.length} />
+                </div>
+              </div>
+
+              <div className="manager-tabs">
+                <button className={activePanel === "lessons" ? "manager-tab active" : "manager-tab"} type="button" onClick={() => setActivePanel("lessons")}>
+                  <Video size={18} />
+                  Уроки
+                </button>
+                <button className={activePanel === "tasks" ? "manager-tab active" : "manager-tab"} type="button" onClick={() => setActivePanel("tasks")}>
+                  <ListChecks size={18} />
+                  Задания
+                </button>
+                <button className={activePanel === "progress" ? "manager-tab active" : "manager-tab"} type="button" onClick={() => setActivePanel("progress")}>
+                  <BarChart3 size={18} />
+                  Прогресс
+                </button>
+              </div>
+
+              {activePanel === "lessons" && (
+                <div className="teacher-panel manager-section">
+                  <div className="section-heading lesson-section-heading">
+                    <PanelTitle icon={<Video size={20} />} title="Уроки курса" />
+                    <button className="secondary-button lesson-add-button" type="button" onClick={openNewLessonForm}>
+                      <Plus size={18} />
+                      Добавить урок
+                    </button>
+                  </div>
+                  <div className="lesson-manager-list">
+                    {courseDetail.lessons.length ? (
+                      courseDetail.lessons.map((lesson) => (
+                        <div
+                          className={lesson.id === selectedLessonId ? "lesson-manager-item active" : "lesson-manager-item"}
+                          key={lesson.id}
+                        >
+                          <button className="lesson-manager-select" type="button" onClick={() => setSelectedLessonId(lesson.id)}>
+                            <strong>{lesson.order_index}. {lesson.title}</strong>
+                            <span>{formatTaskCount(lesson.tasks.length)}</span>
+                          </button>
+                          <button className="secondary-button" type="button" onClick={() => editLesson(lesson.id)}>
+                            <Pencil size={18} />
+                            Редактировать
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="helper-text">Добавьте первый урок. После этого можно будет создавать задания.</p>
+                    )}
+                  </div>
+
+                  {isLessonFormOpen && (
+                    <form className="teacher-form separated-form" onSubmit={saveLesson}>
+                      <h3>{editingLessonId ? "Редактировать урок" : "Добавить урок"}</h3>
+                      <p className="helper-text">YouTube и Rutube можно вставлять обычной ссылкой. При сохранении она станет ссылкой для встраивания.</p>
+                      <Field label="Название урока" value={lessonForm.title} onChange={(value) => setLessonForm({ ...lessonForm, title: value })} />
+                      <Textarea
+                        label="Описание и теория"
+                        value={lessonForm.content}
+                        onChange={(value) => setLessonForm({ ...lessonForm, content: value })}
+                      />
+                      <div className="form-row">
+                        <Field
+                          label="Видео-ссылка"
+                          value={lessonForm.video_url ?? ""}
+                          onChange={(value) => setLessonForm({ ...lessonForm, video_url: value })}
+                          icon={<Video size={16} />}
+                          required={false}
+                        />
+                        <Field
+                          label="Картинка урока"
+                          value={lessonForm.image_url ?? ""}
+                          onChange={(value) => setLessonForm({ ...lessonForm, image_url: value })}
+                          icon={<Image size={16} />}
+                          required={false}
+                        />
+                      </div>
+                      <Field
+                        label="Порядок"
+                        type="number"
+                        value={String(lessonForm.order_index)}
+                        onChange={(value) => setLessonForm({ ...lessonForm, order_index: Number(value) })}
+                      />
+                      <div className="form-actions">
+                        <button className="primary-button" type="submit">
+                          <BookPlus size={18} />
+                          {editingLessonId ? "Сохранить урок" : "Добавить урок"}
+                        </button>
+                        <button className="secondary-button" type="button" onClick={cancelLessonEdit}>
+                          Отмена
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              )}
+
+              {activePanel === "tasks" && (
+                <form className="teacher-panel teacher-form manager-section task-builder" onSubmit={createTask}>
+                  <PanelTitle icon={<ListChecks size={20} />} title="Задания" />
+                  <p className="helper-text">Выберите урок, тип задания и заполните только нужные поля. После сохранения задание сразу появится у студентов в этом уроке.</p>
+
+                  {!courseDetail.lessons.length && <p className="form-error">Сначала добавьте хотя бы один урок во вкладке "Уроки".</p>}
+
+                  <div className="builder-step">
+                    <span>1</span>
+                    <strong>Куда добавить</strong>
+                  </div>
+                  <label>
+                    Урок
+                    <select
+                      value={selectedLessonId ?? ""}
+                      onChange={(event) => setSelectedLessonId(Number(event.target.value))}
+                      required
+                    >
+                      <option value="" disabled>
+                        Выберите урок
+                      </option>
+                      {courseDetail.lessons.map((lesson) => (
+                        <option key={lesson.id} value={lesson.id}>
+                          {lesson.order_index}. {lesson.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <div className="builder-step">
+                    <span>2</span>
+                    <strong>Тип задания</strong>
+                  </div>
+                  <div className="task-type-grid">
+                    <TaskTypeButton
+                      active={taskForm.type === "quiz"}
+                      description="Вопрос и несколько вариантов"
+                      label="Квиз"
+                      onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "quiz"))}
+                    />
+                    <TaskTypeButton
+                      active={taskForm.type === "chart"}
+                      description="График, ответ кликом"
+                      label="График"
+                      onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "chart"))}
+                    />
+                    <TaskTypeButton
+                      active={taskForm.type === "rebus"}
+                      description="Ребус и текстовый ответ"
+                      label="Ребус"
+                      onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "rebus"))}
+                    />
+                  </div>
+
+                  <div className="builder-step">
+                    <span>3</span>
+                    <strong>Содержание</strong>
+                  </div>
+                  <Field label="Название" value={taskForm.title} onChange={(value) => setTaskForm({ ...taskForm, title: value })} />
+                  <Textarea label="Вопрос для ученика" value={taskForm.prompt} onChange={(value) => setTaskForm({ ...taskForm, prompt: value })} />
+                  <TaskPayloadFields taskForm={taskForm} setTaskForm={setTaskForm} />
+
+                  <div className="builder-step">
+                    <span>4</span>
+                    <strong>Дополнительно</strong>
+                  </div>
+                  <div className="form-row">
+                    <Field
+                      label="Картинка задания"
+                      value={taskForm.image_url ?? ""}
+                      onChange={(value) => setTaskForm({ ...taskForm, image_url: value })}
+                      icon={<Image size={16} />}
+                      required={false}
+                    />
+                    <Field
+                      label="Порядок"
+                      type="number"
+                      value={String(taskForm.order_index)}
+                      onChange={(value) => setTaskForm({ ...taskForm, order_index: Number(value) })}
+                    />
+                  </div>
+
+                  <TaskPreview taskForm={taskForm} />
+
+                  <button className="primary-button" type="submit" disabled={!selectedLessonId}>
+                    <ListChecks size={18} />
+                    Добавить задание
+                  </button>
+                </form>
+              )}
+
+              {activePanel === "progress" && (
+                <div className="teacher-panel manager-section progress-panel">
+                  <PanelTitle icon={<UsersRound size={20} />} title="Прогресс студентов" />
+                  {!students.length && <p className="helper-text">Когда студенты начнут проходить курс, здесь появятся выполненные задания и сертификаты.</p>}
+                  {students.map((student) => (
+                    <div className="student-progress" key={student.user_id}>
+                      <div>
+                        <strong>{student.full_name}</strong>
+                        <span>{student.email}</span>
+                      </div>
+                      <span>{student.progress_percent}%</span>
+                      <div className="progress-line">
+                        <span style={{ width: `${student.progress_percent}%` }} />
+                      </div>
+                      {student.certificate_code && <small>Сертификат: {student.certificate_code}</small>}
+                      {student.completed_task_titles.length > 0 && (
+                        <small>Выполнено: {student.completed_task_titles.join(", ")}</small>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </section>
     </Layout>
@@ -448,7 +687,7 @@ function normalizeCourse(payload: CourseMutation): CourseMutation {
 function normalizeLesson(payload: LessonMutation): LessonMutation {
   return {
     ...payload,
-    video_url: payload.video_url?.trim() || null,
+    video_url: normalizeVideoUrl(payload.video_url),
     image_url: payload.image_url?.trim() || null,
   };
 }
@@ -463,6 +702,44 @@ function getOptions(taskForm: TaskMutation): string[] {
 
 function getPoints(taskForm: TaskMutation): ChartPoint[] {
   return Array.isArray(taskForm.payload.points) ? (taskForm.payload.points as ChartPoint[]) : [];
+}
+
+function normalizeVideoUrl(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+
+  try {
+    const url = new URL(trimmed);
+    const host = url.hostname.replace(/^www\./, "");
+    if (host === "youtu.be") {
+      return `https://www.youtube.com/embed/${url.pathname.replace("/", "")}`;
+    }
+    if (host === "youtube.com" || host === "m.youtube.com") {
+      if (url.pathname === "/watch") {
+        const videoId = url.searchParams.get("v");
+        if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+      }
+      if (url.pathname.startsWith("/shorts/")) {
+        return `https://www.youtube.com/embed/${url.pathname.split("/")[2]}`;
+      }
+      if (url.pathname.startsWith("/embed/")) {
+        return trimmed;
+      }
+    }
+    if (host === "rutube.ru" || host === "m.rutube.ru") {
+      if (url.pathname.startsWith("/play/embed/")) {
+        return trimmed;
+      }
+      if (url.pathname.startsWith("/video/")) {
+        const videoId = url.pathname.split("/").filter(Boolean)[1];
+        if (videoId) return `https://rutube.ru/play/embed/${videoId}`;
+      }
+    }
+  } catch {
+    return trimmed;
+  }
+
+  return trimmed;
 }
 
 function SummaryBox({ icon, label, value }: { icon: React.ReactNode; label: string; value: number | string }) {
@@ -551,7 +828,7 @@ function TaskPayloadFields({
       <div className="specific-fields">
         <p className="helper-text">Добавьте подписи и числа. Ученик увидит график и выберет одну из подписей.</p>
         {points.map((point, index) => (
-          <div className="option-editor-row" key={`${point.label}-${index}`}>
+          <div className="option-editor-row" key={`chart-point-${index}`}>
             <input
               value={point.label}
               onChange={(event) => {
@@ -616,8 +893,8 @@ function TaskPayloadFields({
             onChange={(event) => setTaskForm({ ...taskForm, correct_answer: event.target.value })}
             required
           >
-            {points.map((point) => (
-              <option key={point.label} value={point.label}>
+            {points.map((point, index) => (
+              <option key={`${point.label}-${point.value}-${index}`} value={point.label}>
                 {point.label}
               </option>
             ))}
@@ -657,7 +934,7 @@ function TaskPayloadFields({
     <div className="specific-fields">
       <p className="helper-text">Варианты станут кнопками. Правильный ответ выбирается из списка ниже.</p>
       {options.map((option, index) => (
-        <div className="option-editor-row" key={`${option}-${index}`}>
+        <div className="option-editor-row" key={`quiz-option-${index}`}>
           <input
             value={option}
             onChange={(event) => {
@@ -708,8 +985,8 @@ function TaskPayloadFields({
           onChange={(event) => setTaskForm({ ...taskForm, correct_answer: event.target.value })}
           required
         >
-          {options.map((option) => (
-            <option key={option} value={option}>
+          {options.map((option, index) => (
+            <option key={`${option}-${index}`} value={option}>
               {option}
             </option>
           ))}
@@ -729,8 +1006,8 @@ function TaskPreview({ taskForm }: { taskForm: TaskMutation }) {
       <p>{taskForm.prompt || "Вопрос для ученика"}</p>
       {taskForm.type === "quiz" && (
         <div className="preview-options">
-          {options.map((option) => (
-            <button key={option} type="button">
+          {options.map((option, index) => (
+            <button key={`preview-option-${index}`} type="button">
               {option}
             </button>
           ))}
@@ -738,8 +1015,8 @@ function TaskPreview({ taskForm }: { taskForm: TaskMutation }) {
       )}
       {taskForm.type === "chart" && (
         <div className="preview-bars">
-          {points.map((point) => (
-            <div key={point.label}>
+          {points.map((point, index) => (
+            <div key={`preview-point-${index}`}>
               <span style={{ height: `${Math.max(12, Math.min(100, point.value * 4))}px` }} />
               <small>{point.label}</small>
             </div>

@@ -1,16 +1,18 @@
-import { Award, CheckCircle2, ChevronLeft, Lock, PlayCircle } from "lucide-react";
+import { Award, CheckCircle2, ChevronLeft, Lock, PlayCircle, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { api } from "../api";
 import { InteractiveTask } from "../components/InteractiveTask";
 import { Layout } from "../components/Layout";
+import { formatTaskCount } from "../format";
 import type { CourseDetail, Task } from "../types";
 
 export function CoursePage() {
   const { courseId = "" } = useParams();
   const [course, setCourse] = useState<CourseDetail | null>(null);
   const [error, setError] = useState("");
+  const [retryTaskIds, setRetryTaskIds] = useState<Set<number>>(() => new Set());
 
   async function loadCourse() {
     try {
@@ -46,6 +48,21 @@ export function CoursePage() {
     }
   }
 
+  function retryTask(taskId: number) {
+    setRetryTaskIds((current) => new Set(current).add(taskId));
+  }
+
+  async function handleTaskAnswered(taskId: number, isCorrect: boolean) {
+    await loadCourse();
+    if (isCorrect) {
+      setRetryTaskIds((current) => {
+        const next = new Set(current);
+        next.delete(taskId);
+        return next;
+      });
+    }
+  }
+
   return (
     <Layout>
       <div className="page-nav">
@@ -70,7 +87,7 @@ export function CoursePage() {
             <div className="progress-widget">
               <strong>{course.progress_percent}%</strong>
               <span>
-                {course.completed_tasks}/{course.total_tasks} заданий
+                {course.completed_tasks}/{formatTaskCount(course.total_tasks)}
               </span>
               <div className="progress-line">
                 <span style={{ width: `${course.progress_percent}%` }} />
@@ -88,17 +105,20 @@ export function CoursePage() {
                   {lesson.image_url && <img className="lesson-image" src={lesson.image_url} alt="" />}
                   {lesson.video_url && (
                     <div className="video-frame">
-                      <iframe src={lesson.video_url} title={lesson.title} allowFullScreen />
+                      <iframe src={getEmbedVideoUrl(lesson.video_url)} title={lesson.title} allowFullScreen />
                     </div>
                   )}
                 </div>
                 <div className="task-stack">
                   {lesson.tasks.map((task) => {
-                    if (task.result?.is_correct) {
-                      return <TaskStateCard key={task.id} task={task} state="done" />;
+                    if (task.result?.is_correct && !retryTaskIds.has(task.id)) {
+                      return <TaskStateCard key={task.id} task={task} state="done" onRetry={() => retryTask(task.id)} />;
                     }
                     if (task.id === activeTaskId) {
-                      return <InteractiveTask key={task.id} task={task} onSolved={loadCourse} />;
+                      return <InteractiveTask key={task.id} task={task} onSolved={(isCorrect) => handleTaskAnswered(task.id, isCorrect)} />;
+                    }
+                    if (retryTaskIds.has(task.id)) {
+                      return <InteractiveTask key={task.id} task={task} onSolved={(isCorrect) => handleTaskAnswered(task.id, isCorrect)} />;
                     }
                     return <TaskStateCard key={task.id} task={task} state="locked" />;
                   })}
@@ -135,7 +155,39 @@ export function CoursePage() {
   );
 }
 
-function TaskStateCard({ task, state }: { task: Task; state: "done" | "locked" }) {
+function getEmbedVideoUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.replace(/^www\./, "");
+    if (host === "youtu.be") {
+      return `https://www.youtube.com/embed/${url.pathname.replace("/", "")}`;
+    }
+    if (host === "youtube.com" || host === "m.youtube.com") {
+      if (url.pathname === "/watch") {
+        const videoId = url.searchParams.get("v");
+        if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+      }
+      if (url.pathname.startsWith("/shorts/")) {
+        return `https://www.youtube.com/embed/${url.pathname.split("/")[2]}`;
+      }
+    }
+    if (host === "rutube.ru" || host === "m.rutube.ru") {
+      if (url.pathname.startsWith("/play/embed/")) {
+        return value;
+      }
+      if (url.pathname.startsWith("/video/")) {
+        const videoId = url.pathname.split("/").filter(Boolean)[1];
+        if (videoId) return `https://rutube.ru/play/embed/${videoId}`;
+      }
+    }
+  } catch {
+    return value;
+  }
+
+  return value;
+}
+
+function TaskStateCard({ task, state, onRetry }: { task: Task; state: "done" | "locked"; onRetry?: () => void }) {
   return (
     <section className={`task-panel task-panel--${state}`}>
       <div className="task-header">
@@ -145,6 +197,12 @@ function TaskStateCard({ task, state }: { task: Task; state: "done" | "locked" }
           <p>{state === "done" ? "Задание выполнено. Следующий шаг открыт." : "Откроется после предыдущего задания."}</p>
         </div>
       </div>
+      {state === "done" && onRetry && (
+        <button className="secondary-button retry-button" type="button" onClick={onRetry}>
+          <RotateCcw size={18} />
+          Пройти заново
+        </button>
+      )}
     </section>
   );
 }

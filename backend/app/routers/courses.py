@@ -291,6 +291,19 @@ async def course_students_progress(
         certificate = await session.scalar(
             select(Certificate).where(Certificate.course_id == course_id, Certificate.user_id == student.id)
         )
+        completed_task_titles = (
+            await session.scalars(
+                select(Task.title)
+                .join(TaskResult, TaskResult.task_id == Task.id)
+                .join(Lesson, Lesson.id == Task.lesson_id)
+                .where(
+                    Lesson.course_id == course_id,
+                    TaskResult.user_id == student.id,
+                    TaskResult.is_correct.is_(True),
+                )
+                .order_by(Lesson.order_index, Task.order_index)
+            )
+        ).all()
         rows.append(
             CourseProgressStudent(
                 user_id=student.id,
@@ -300,6 +313,7 @@ async def course_students_progress(
                 total_tasks=total_tasks,
                 progress_percent=round((completed_tasks / total_tasks) * 100) if total_tasks else 0,
                 certificate_code=certificate.code if certificate else None,
+                completed_task_titles=list(completed_task_titles),
             )
         )
     return rows

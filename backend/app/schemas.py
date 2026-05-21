@@ -121,6 +121,20 @@ class ProgressSummary(BaseModel):
     average_progress: int
 
 
+class CompletedTaskRead(BaseModel):
+    task_id: int
+    task_title: str
+    course_id: int
+    course_title: str
+    lesson_title: str
+    answer: str
+    score: int
+    completed_at: datetime
+    user_id: uuid.UUID
+    student_name: str
+    student_email: EmailStr
+
+
 class CourseMutation(BaseModel):
     title: str = Field(min_length=3, max_length=180)
     description: str = Field(min_length=10)
@@ -156,3 +170,4 @@ class CourseProgressStudent(BaseModel):
     total_tasks: int
     progress_percent: int
     certificate_code: str | None = None
+    completed_task_titles: list[str] = Field(default_factory=list)

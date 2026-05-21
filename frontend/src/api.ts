@@ -2,6 +2,7 @@ import type {
   AdminUser,
   AuthResponse,
   Certificate,
+  CompletedTask,
   CourseDetail,
   CourseListItem,
   CourseMutation,
@@ -44,7 +45,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({ detail: "Ошибка запроса" }));
-    throw new Error(errorBody.detail ?? "Ошибка запроса");
+    throw new Error(formatApiError(errorBody));
   }
 
   if (response.status === 204) {
@@ -52,6 +53,47 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   return response.json() as Promise<T>;
+}
+
+function formatApiError(errorBody: unknown): string {
+  if (!isRecord(errorBody)) {
+    return "Ошибка запроса";
+  }
+
+  const detail = errorBody.detail;
+  if (typeof detail === "string") {
+    return detail;
+  }
+
+  if (Array.isArray(detail)) {
+    const messages = detail.map(formatValidationIssue).filter(Boolean);
+    return messages.length ? messages.join("; ") : "Проверьте поля формы";
+  }
+
+  if (isRecord(detail)) {
+    return formatValidationIssue(detail) || "Проверьте поля формы";
+  }
+
+  return "Ошибка запроса";
+}
+
+function formatValidationIssue(issue: unknown): string {
+  if (!isRecord(issue)) {
+    return "";
+  }
+
+  const fieldPath = Array.isArray(issue.loc)
+    ? issue.loc
+        .filter((part) => part !== "body")
+        .map(String)
+        .join(".")
+    : "";
+  const message = typeof issue.msg === "string" ? issue.msg : "некорректное значение";
+  return fieldPath ? `${fieldPath}: ${message}` : message;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 export const api = {
@@ -87,6 +129,12 @@ export const api = {
   },
   async progress(): Promise<ProgressSummary> {
     return request<ProgressSummary>("/progress/summary");
+  },
+  async certificates(): Promise<Certificate[]> {
+    return request<Certificate[]>("/progress/certificates");
+  },
+  async completedTasks(): Promise<CompletedTask[]> {
+    return request<CompletedTask[]>("/progress/completed-tasks");
   },
   async createCourse(payload: CourseMutation): Promise<CourseListItem> {
     return request<CourseListItem>("/courses", {
