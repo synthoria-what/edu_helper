@@ -18,6 +18,7 @@ import { api } from "../api";
 import { useAuth } from "../auth";
 import { Layout } from "../components/Layout";
 import { formatTaskCount } from "../format";
+import { normalizeVideoUrl } from "../video";
 import type {
   CourseDetail,
   CourseListItem,
@@ -156,6 +157,11 @@ export function TeacherPage() {
       image_url: lesson.image_url ?? "",
       order_index: lesson.order_index,
     });
+  }
+
+  function openTaskBuilder(lessonId: number) {
+    setSelectedLessonId(lessonId);
+    setActivePanel("tasks");
   }
 
   function cancelLessonEdit() {
@@ -457,25 +463,38 @@ export function TeacherPage() {
                       Добавить урок
                     </button>
                   </div>
-                  <div className="lesson-manager-list">
+                  <div className="lesson-module-grid">
                     {courseDetail.lessons.length ? (
                       courseDetail.lessons.map((lesson) => (
-                        <div
-                          className={lesson.id === selectedLessonId ? "lesson-manager-item active" : "lesson-manager-item"}
-                          key={lesson.id}
-                        >
-                          <button className="lesson-manager-select" type="button" onClick={() => setSelectedLessonId(lesson.id)}>
-                            <strong>{lesson.order_index}. {lesson.title}</strong>
+                        <div className={lesson.id === selectedLessonId ? "lesson-module active" : "lesson-module"} key={lesson.id}>
+                          <button className="lesson-module-main" type="button" onClick={() => setSelectedLessonId(lesson.id)}>
+                            <span className="lesson-module-number">Модуль {lesson.order_index}</span>
+                            <strong>{lesson.title}</strong>
+                            <p>{lesson.content}</p>
+                          </button>
+                          <div className="lesson-module-meta">
                             <span>{formatTaskCount(lesson.tasks.length)}</span>
-                          </button>
-                          <button className="secondary-button" type="button" onClick={() => editLesson(lesson.id)}>
-                            <Pencil size={18} />
-                            Редактировать
-                          </button>
+                            {lesson.video_url && <span>Видео добавлено</span>}
+                            {lesson.image_url && <span>Картинка добавлена</span>}
+                          </div>
+                          <div className="lesson-module-actions">
+                            <button className="secondary-button" type="button" onClick={() => editLesson(lesson.id)}>
+                              <Pencil size={18} />
+                              Редактировать
+                            </button>
+                            <button className="secondary-button" type="button" onClick={() => openTaskBuilder(lesson.id)}>
+                              <Plus size={18} />
+                              Добавить задание
+                            </button>
+                          </div>
                         </div>
                       ))
                     ) : (
-                      <p className="helper-text">Добавьте первый урок. После этого можно будет создавать задания.</p>
+                      <div className="empty-state">
+                        <Video size={24} />
+                        <strong>Уроков пока нет</strong>
+                        <span>Добавьте первый модуль курса. После этого можно будет создавать задания внутри него.</span>
+                      </div>
                     )}
                   </div>
 
@@ -702,44 +721,6 @@ function getOptions(taskForm: TaskMutation): string[] {
 
 function getPoints(taskForm: TaskMutation): ChartPoint[] {
   return Array.isArray(taskForm.payload.points) ? (taskForm.payload.points as ChartPoint[]) : [];
-}
-
-function normalizeVideoUrl(value: string | null | undefined): string | null {
-  const trimmed = value?.trim();
-  if (!trimmed) return null;
-
-  try {
-    const url = new URL(trimmed);
-    const host = url.hostname.replace(/^www\./, "");
-    if (host === "youtu.be") {
-      return `https://www.youtube.com/embed/${url.pathname.replace("/", "")}`;
-    }
-    if (host === "youtube.com" || host === "m.youtube.com") {
-      if (url.pathname === "/watch") {
-        const videoId = url.searchParams.get("v");
-        if (videoId) return `https://www.youtube.com/embed/${videoId}`;
-      }
-      if (url.pathname.startsWith("/shorts/")) {
-        return `https://www.youtube.com/embed/${url.pathname.split("/")[2]}`;
-      }
-      if (url.pathname.startsWith("/embed/")) {
-        return trimmed;
-      }
-    }
-    if (host === "rutube.ru" || host === "m.rutube.ru") {
-      if (url.pathname.startsWith("/play/embed/")) {
-        return trimmed;
-      }
-      if (url.pathname.startsWith("/video/")) {
-        const videoId = url.pathname.split("/").filter(Boolean)[1];
-        if (videoId) return `https://rutube.ru/play/embed/${videoId}`;
-      }
-    }
-  } catch {
-    return trimmed;
-  }
-
-  return trimmed;
 }
 
 function SummaryBox({ icon, label, value }: { icon: React.ReactNode; label: string; value: number | string }) {
