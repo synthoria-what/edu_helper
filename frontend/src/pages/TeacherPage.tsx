@@ -173,6 +173,13 @@ export function TeacherPage() {
     openNewTaskForm(lessonId);
   }
 
+  function selectTaskLesson(lessonId: number) {
+    setSelectedLessonId(lessonId);
+    setEditingTaskId(null);
+    setIsTaskFormOpen(false);
+    setTaskForm(defaultTaskForm(getNextTaskOrder(lessonId), taskForm.type));
+  }
+
   function cancelLessonEdit() {
     setEditingLessonId(null);
     setIsLessonFormOpen(false);
@@ -614,30 +621,21 @@ export function TeacherPage() {
 
                   {!courseDetail.lessons.length && <p className="form-error">Сначала добавьте хотя бы один урок во вкладке "Уроки".</p>}
 
-                  <label className="task-lesson-select">
-                    Урок
-                    <select
-                      value={selectedLessonId ?? ""}
-                      disabled={Boolean(editingTaskId)}
-                      onChange={(event) => {
-                        const lessonId = Number(event.target.value);
-                        setSelectedLessonId(lessonId);
-                        setEditingTaskId(null);
-                        setIsTaskFormOpen(false);
-                        setTaskForm(defaultTaskForm(getNextTaskOrder(lessonId), taskForm.type));
-                      }}
-                      required
-                    >
-                      <option value="" disabled>
-                        Выберите урок
-                      </option>
-                      {courseDetail.lessons.map((lesson) => (
-                        <option key={lesson.id} value={lesson.id}>
-                          {lesson.order_index}. {lesson.title}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <div className="task-lesson-grid">
+                    {courseDetail.lessons.map((lesson) => (
+                      <button
+                        className={lesson.id === selectedLessonId ? "task-lesson-card active" : "task-lesson-card"}
+                        disabled={Boolean(editingTaskId)}
+                        key={lesson.id}
+                        type="button"
+                        onClick={() => selectTaskLesson(lesson.id)}
+                      >
+                        <span>Модуль {lesson.order_index}</span>
+                        <strong>{lesson.title}</strong>
+                        <small>{formatTaskCount(lesson.tasks.length)}</small>
+                      </button>
+                    ))}
+                  </div>
 
                   {selectedLessonId && (
                     <div className="task-editor-list">
@@ -645,16 +643,16 @@ export function TeacherPage() {
                         courseDetail.lessons
                           .find((lesson) => lesson.id === selectedLessonId)
                           ?.tasks.map((task) => (
-                          <div className={task.id === editingTaskId ? "task-editor-item active" : "task-editor-item"} key={task.id}>
-                            <div>
-                              <span>{task.order_index}. {task.type}</span>
-                              <strong>{task.title}</strong>
+                            <div className={task.id === editingTaskId ? "task-editor-item active" : "task-editor-item"} key={task.id}>
+                              <div>
+                                <span>{task.order_index}. {task.type}</span>
+                                <strong>{task.title}</strong>
+                              </div>
+                              <button className="secondary-button" type="button" onClick={() => editTask(selectedLessonId, task)}>
+                                <Pencil size={18} />
+                                Редактировать
+                              </button>
                             </div>
-                            <button className="secondary-button" type="button" onClick={() => editTask(selectedLessonId, task)}>
-                              <Pencil size={18} />
-                              Редактировать
-                            </button>
-                          </div>
                           ))
                       ) : (
                         <div className="empty-state compact">

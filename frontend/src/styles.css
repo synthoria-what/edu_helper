@@ -1207,11 +1207,50 @@ select {
   gap: 10px;
 }
 
-.task-lesson-select {
+.task-lesson-grid {
   display: grid;
-  gap: 8px;
-  color: #465451;
-  font-size: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.task-lesson-card {
+  display: grid;
+  gap: 5px;
+  min-height: 94px;
+  border: 1px solid #d8ddd7;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+  color: #263735;
+  text-align: left;
+}
+
+.task-lesson-card.active {
+  border-color: #2f6f6a;
+  background: #edf7f5;
+}
+
+.task-lesson-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+.task-lesson-card span {
+  color: #d08a28;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.task-lesson-card strong {
+  overflow: hidden;
+  color: #182b29;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-lesson-card small {
+  color: #60706d;
   font-weight: 800;
 }
 
