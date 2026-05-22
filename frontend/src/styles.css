@@ -1202,6 +1202,47 @@ select {
   gap: 18px;
 }
 
+.task-editor-list {
+  display: grid;
+  gap: 10px;
+}
+
+.task-editor-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #d8ddd7;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.task-editor-item.active {
+  border-color: #2f6f6a;
+  background: #edf7f5;
+}
+
+.task-editor-item div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.task-editor-item span {
+  color: #d08a28;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.task-editor-item strong {
+  overflow: hidden;
+  color: #182b29;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .builder-step {
   display: inline-flex;
   align-items: center;
@@ -1368,6 +1409,57 @@ select {
 
 .input-with-icon input {
   padding-left: 38px;
+}
+
+.image-upload-field {
+  display: grid;
+  gap: 10px;
+}
+
+.file-picker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  width: fit-content;
+  border: 1px solid #c9d7d4;
+  border-radius: 8px;
+  padding: 0 16px;
+  background: #fffdfa;
+  color: #2f6f6a;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.file-picker input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.file-picker:has(input:disabled) {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.upload-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.upload-preview img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px solid #d8ddd7;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #fff;
 }
 
 .teacher-list {
@@ -1540,6 +1632,8 @@ select {
   .task-type-grid,
   .option-editor-row,
   .option-editor-row:has(input + input),
+  .upload-preview,
+  .task-editor-item,
   .admin-user-card {
     grid-template-columns: 1fr;
   }

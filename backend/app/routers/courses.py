@@ -1,7 +1,7 @@
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -46,13 +46,14 @@ def build_certificate_read(certificate: Certificate) -> CertificateRead:
     )
 
 
-def build_task_read(task: Task, result: TaskResult | None = None) -> TaskRead:
+def build_task_read(task: Task, result: TaskResult | None = None, include_answer: bool = False) -> TaskRead:
     return TaskRead(
         id=task.id,
         type=task.type,
         title=task.title,
         prompt=task.prompt,
         payload=task.payload,
+        correct_answer=task.correct_answer if include_answer else None,
         image_url=task.image_url,
         order_index=task.order_index,
         result=TaskResultRead.model_validate(result) if result else None,
@@ -188,8 +189,16 @@ async def delete_course(
     session: AsyncSession = Depends(get_session),
 ) -> None:
     require_course_editor(current_user)
-    course = await get_course_or_404(session, course_id)
-    await session.delete(course)
+    await get_course_or_404(session, course_id)
+
+    lesson_ids = select(Lesson.id).where(Lesson.course_id == course_id)
+    task_ids = select(Task.id).where(Task.lesson_id.in_(lesson_ids))
+
+    await session.execute(delete(TaskResult).where(TaskResult.task_id.in_(task_ids)))
+    await session.execute(delete(Certificate).where(Certificate.course_id == course_id))
+    await session.execute(delete(Task).where(Task.lesson_id.in_(lesson_ids)))
+    await session.execute(delete(Lesson).where(Lesson.course_id == course_id))
+    await session.execute(delete(Course).where(Course.id == course_id))
     await session.commit()
 
 
@@ -252,7 +261,7 @@ async def create_task(
     session.add(task)
     await session.commit()
     await session.refresh(task)
-    return build_task_read(task)
+    return build_task_read(task, include_answer=True)
 
 
 @router.put("/tasks/{task_id}", response_model=TaskRead)
@@ -270,7 +279,7 @@ async def update_task(
         setattr(task, field, value)
     await session.commit()
     await session.refresh(task)
-    return build_task_read(task)
+    return build_task_read(task, include_answer=True)
 
 
 @router.get("/{course_id}/students", response_model=list[CourseProgressStudent])
@@ -341,6 +350,7 @@ async def get_course(
     )
     results_by_task = {result.task_id: result for result in result_rows.all()}
 
+    include_answers = current_user.role in {UserRole.teacher, UserRole.admin}
     lessons = [
         LessonRead(
             id=lesson.id,
@@ -350,7 +360,7 @@ async def get_course(
             image_url=lesson.image_url,
             order_index=lesson.order_index,
             tasks=[
-                build_task_read(task, results_by_task.get(task.id))
+                build_task_read(task, results_by_task.get(task.id), include_answer=include_answers)
                 for task in lesson.tasks
             ],
         )

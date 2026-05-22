@@ -29,6 +29,7 @@ export type Task = {
   title: string;
   prompt: string;
   payload: Record<string, unknown>;
+  correct_answer: string | null;
   image_url: string | null;
   order_index: number;
   result: TaskResult | null;

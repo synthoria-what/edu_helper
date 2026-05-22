@@ -9,6 +9,7 @@ import {
   Plus,
   Save,
   Trash2,
+  Upload,
   UsersRound,
   Video,
 } from "lucide-react";
@@ -25,6 +26,7 @@ import type {
   CourseMutation,
   LessonMutation,
   StudentProgress,
+  Task,
   TaskMutation,
   TaskType,
 } from "../types";
@@ -64,6 +66,7 @@ export function TeacherPage() {
   const [taskForm, setTaskForm] = useState(defaultTaskForm());
   const [selectedLessonId, setSelectedLessonId] = useState<number | null>(null);
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [isLessonFormOpen, setIsLessonFormOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [isCourseFormOpen, setIsCourseFormOpen] = useState(false);
@@ -90,6 +93,7 @@ export function TeacherPage() {
     setCourseForm(emptyCourse);
     setSelectedLessonId(null);
     setEditingLessonId(null);
+    setEditingTaskId(null);
     setIsLessonFormOpen(false);
     setLessonForm(emptyLesson);
     setTaskForm(defaultTaskForm());
@@ -101,6 +105,7 @@ export function TeacherPage() {
     setIsCourseFormOpen(false);
     setActivePanel("lessons");
     setEditingLessonId(null);
+    setEditingTaskId(null);
     setIsLessonFormOpen(false);
   }
 
@@ -161,6 +166,8 @@ export function TeacherPage() {
 
   function openTaskBuilder(lessonId: number) {
     setSelectedLessonId(lessonId);
+    setEditingTaskId(null);
+    setTaskForm(defaultTaskForm(getNextTaskOrder(lessonId), taskForm.type));
     setActivePanel("tasks");
   }
 
@@ -168,6 +175,31 @@ export function TeacherPage() {
     setEditingLessonId(null);
     setIsLessonFormOpen(false);
     setLessonForm({ ...emptyLesson, order_index: (courseDetail?.lessons.length ?? 0) + 1 });
+  }
+
+  function editTask(lessonId: number, task: Task) {
+    setSelectedLessonId(lessonId);
+    setActivePanel("tasks");
+    setEditingTaskId(task.id);
+    setTaskForm({
+      type: task.type,
+      title: task.title,
+      prompt: task.prompt,
+      payload: task.payload,
+      correct_answer: task.correct_answer ?? "",
+      image_url: task.image_url ?? "",
+      order_index: task.order_index,
+    });
+  }
+
+  function cancelTaskEdit() {
+    setEditingTaskId(null);
+    setTaskForm(defaultTaskForm(getNextTaskOrder(), taskForm.type));
+  }
+
+  function getNextTaskOrder(lessonId = selectedLessonId): number {
+    const lesson = courseDetail?.lessons.find((item) => item.id === lessonId);
+    return (lesson?.tasks.length ?? 0) + 1;
   }
 
   useEffect(() => {
@@ -248,16 +280,22 @@ export function TeacherPage() {
     }
   }
 
-  async function createTask(event: FormEvent) {
+  async function saveTask(event: FormEvent) {
     event.preventDefault();
     if (!selectedLessonId || !selectedCourseId) return;
     try {
-      await api.createTask(selectedLessonId, normalizeTask(taskForm));
-      setTaskForm(defaultTaskForm(taskForm.order_index + 1, taskForm.type));
+      if (editingTaskId) {
+        await api.updateTask(editingTaskId, normalizeTask(taskForm));
+        setEditingTaskId(null);
+        notify("Задание обновлено");
+      } else {
+        await api.createTask(selectedLessonId, normalizeTask(taskForm));
+        notify("Задание добавлено");
+      }
       await loadCourse(selectedCourseId);
-      notify("Задание добавлено");
+      setTaskForm(defaultTaskForm(editingTaskId ? getNextTaskOrder() : taskForm.order_index + 1, taskForm.type));
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Не удалось добавить задание");
+      notify(error instanceof Error ? error.message : "Не удалось сохранить задание");
     }
   }
 
@@ -273,6 +311,7 @@ export function TeacherPage() {
       setStudents([]);
       setSelectedLessonId(null);
       setEditingLessonId(null);
+      setEditingTaskId(null);
       setIsLessonFormOpen(false);
       setCourseForm(emptyCourse);
       setLessonForm(emptyLesson);
@@ -524,6 +563,11 @@ export function TeacherPage() {
                           required={false}
                         />
                       </div>
+                      <ImageUploadField
+                        imageUrl={lessonForm.image_url ?? ""}
+                        onChange={(value) => setLessonForm({ ...lessonForm, image_url: value })}
+                        onError={notify}
+                      />
                       <Field
                         label="Порядок"
                         type="number"
@@ -545,11 +589,30 @@ export function TeacherPage() {
               )}
 
               {activePanel === "tasks" && (
-                <form className="teacher-panel teacher-form manager-section task-builder" onSubmit={createTask}>
-                  <PanelTitle icon={<ListChecks size={20} />} title="Задания" />
+                <form className="teacher-panel teacher-form manager-section task-builder" onSubmit={saveTask}>
+                  <PanelTitle icon={<ListChecks size={20} />} title={editingTaskId ? "Редактировать задание" : "Задания"} />
                   <p className="helper-text">Выберите урок, тип задания и заполните только нужные поля. После сохранения задание сразу появится у студентов в этом уроке.</p>
 
                   {!courseDetail.lessons.length && <p className="form-error">Сначала добавьте хотя бы один урок во вкладке "Уроки".</p>}
+
+                  {selectedLessonId && (
+                    <div className="task-editor-list">
+                      {courseDetail.lessons
+                        .find((lesson) => lesson.id === selectedLessonId)
+                        ?.tasks.map((task) => (
+                          <div className={task.id === editingTaskId ? "task-editor-item active" : "task-editor-item"} key={task.id}>
+                            <div>
+                              <span>{task.order_index}. {task.type}</span>
+                              <strong>{task.title}</strong>
+                            </div>
+                            <button className="secondary-button" type="button" onClick={() => editTask(selectedLessonId, task)}>
+                              <Pencil size={18} />
+                              Редактировать
+                            </button>
+                          </div>
+                        )) ?? null}
+                    </div>
+                  )}
 
                   <div className="builder-step">
                     <span>1</span>
@@ -559,7 +622,12 @@ export function TeacherPage() {
                     Урок
                     <select
                       value={selectedLessonId ?? ""}
-                      onChange={(event) => setSelectedLessonId(Number(event.target.value))}
+                      disabled={Boolean(editingTaskId)}
+                      onChange={(event) => {
+                        const lessonId = Number(event.target.value);
+                        setSelectedLessonId(lessonId);
+                        setTaskForm(defaultTaskForm(getNextTaskOrder(lessonId), taskForm.type));
+                      }}
                       required
                     >
                       <option value="" disabled>
@@ -628,10 +696,17 @@ export function TeacherPage() {
 
                   <TaskPreview taskForm={taskForm} />
 
-                  <button className="primary-button" type="submit" disabled={!selectedLessonId}>
-                    <ListChecks size={18} />
-                    Добавить задание
-                  </button>
+                  <div className="form-actions">
+                    <button className="primary-button" type="submit" disabled={!selectedLessonId}>
+                      <ListChecks size={18} />
+                      {editingTaskId ? "Сохранить задание" : "Добавить задание"}
+                    </button>
+                    {editingTaskId && (
+                      <button className="secondary-button" type="button" onClick={cancelTaskEdit}>
+                        Отмена
+                      </button>
+                    )}
+                  </div>
                 </form>
               )}
 
@@ -793,6 +868,54 @@ function Textarea({ label, value, onChange }: { label: string; value: string; on
       {label}
       <textarea value={value} onChange={(event) => onChange(event.target.value)} required />
     </label>
+  );
+}
+
+function ImageUploadField({
+  imageUrl,
+  onChange,
+  onError,
+}: {
+  imageUrl: string;
+  onChange: (value: string) => void;
+  onError: (message: string) => void;
+}) {
+  const [isUploading, setIsUploading] = useState(false);
+
+  async function uploadSelectedFile(file: File | undefined) {
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const uploaded = await api.uploadImage(file);
+      onChange(uploaded.url);
+    } catch (error) {
+      onError(error instanceof Error ? error.message : "Не удалось загрузить картинку");
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  return (
+    <div className="image-upload-field">
+      <label className="file-picker">
+        <Upload size={18} />
+        <span>{isUploading ? "Загружаем..." : "Загрузить картинку файлом"}</span>
+        <input
+          accept="image/gif,image/jpeg,image/png,image/webp"
+          disabled={isUploading}
+          type="file"
+          onChange={(event) => void uploadSelectedFile(event.target.files?.[0])}
+        />
+      </label>
+      {imageUrl && (
+        <div className="upload-preview">
+          <img src={imageUrl} alt="" />
+          <button className="secondary-button" type="button" onClick={() => onChange("")}>
+            Убрать
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

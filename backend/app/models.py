@@ -32,8 +32,8 @@ class User(Base):
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.student)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    results: Mapped[list["TaskResult"]] = relationship(back_populates="user")
-    certificates: Mapped[list["Certificate"]] = relationship(back_populates="user")
+    results: Mapped[list["TaskResult"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    certificates: Mapped[list["Certificate"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class Course(Base):
@@ -52,7 +52,7 @@ class Course(Base):
         cascade="all, delete-orphan",
         order_by="Lesson.order_index",
     )
-    certificates: Mapped[list["Certificate"]] = relationship(back_populates="course")
+    certificates: Mapped[list["Certificate"]] = relationship(back_populates="course", cascade="all, delete-orphan")
 
 
 class Lesson(Base):
@@ -88,7 +88,7 @@ class Task(Base):
     order_index: Mapped[int] = mapped_column(Integer, default=0)
 
     lesson: Mapped[Lesson] = relationship(back_populates="tasks")
-    results: Mapped[list["TaskResult"]] = relationship(back_populates="task")
+    results: Mapped[list["TaskResult"]] = relationship(back_populates="task", cascade="all, delete-orphan")
 
 
 class TaskResult(Base):

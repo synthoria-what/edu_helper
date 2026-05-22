@@ -56,6 +56,7 @@ class TaskRead(BaseModel):
     title: str
     prompt: str
     payload: dict
+    correct_answer: str | None = None
     image_url: str | None
     order_index: int
     result: TaskResultRead | None = None

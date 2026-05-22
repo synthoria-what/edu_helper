@@ -55,6 +55,32 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function upload<T>(path: string, formData: FormData): Promise<T> {
+  const token = getToken();
+  const response = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({ detail: "Ошибка загрузки" }));
+    throw new Error(formatApiError(errorBody));
+  }
+
+  return response.json() as Promise<T>;
+}
+
+function resolveApiAssetUrl(path: string): string {
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+
+  return `${API_URL.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 function formatApiError(errorBody: unknown): string {
   if (!isRecord(errorBody)) {
     return "Ошибка запроса";
@@ -162,6 +188,12 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(payload),
     });
+  },
+  async uploadImage(file: File): Promise<{ url: string }> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const uploaded = await upload<{ url: string }>("/uploads/images", formData);
+    return { url: resolveApiAssetUrl(uploaded.url) };
   },
   async createTask(lessonId: number, payload: TaskMutation): Promise<Task> {
     return request<Task>(`/courses/lessons/${lessonId}/tasks`, {
