@@ -1207,6 +1207,14 @@ select {
   gap: 10px;
 }
 
+.task-lesson-select {
+  display: grid;
+  gap: 8px;
+  color: #465451;
+  font-size: 14px;
+  font-weight: 800;
+}
+
 .task-editor-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

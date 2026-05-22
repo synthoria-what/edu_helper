@@ -68,6 +68,7 @@ export function TeacherPage() {
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [isLessonFormOpen, setIsLessonFormOpen] = useState(false);
+  const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [isCourseFormOpen, setIsCourseFormOpen] = useState(false);
   const [activePanel, setActivePanel] = useState<ManagerPanel>("lessons");
@@ -95,6 +96,7 @@ export function TeacherPage() {
     setEditingLessonId(null);
     setEditingTaskId(null);
     setIsLessonFormOpen(false);
+    setIsTaskFormOpen(false);
     setLessonForm(emptyLesson);
     setTaskForm(defaultTaskForm());
     setIsCourseFormOpen(true);
@@ -107,6 +109,7 @@ export function TeacherPage() {
     setEditingLessonId(null);
     setEditingTaskId(null);
     setIsLessonFormOpen(false);
+    setIsTaskFormOpen(false);
   }
 
   function closeCourseForm() {
@@ -166,9 +169,8 @@ export function TeacherPage() {
 
   function openTaskBuilder(lessonId: number) {
     setSelectedLessonId(lessonId);
-    setEditingTaskId(null);
-    setTaskForm(defaultTaskForm(getNextTaskOrder(lessonId), taskForm.type));
     setActivePanel("tasks");
+    openNewTaskForm(lessonId);
   }
 
   function cancelLessonEdit() {
@@ -181,6 +183,7 @@ export function TeacherPage() {
     setSelectedLessonId(lessonId);
     setActivePanel("tasks");
     setEditingTaskId(task.id);
+    setIsTaskFormOpen(true);
     setTaskForm({
       type: task.type,
       title: task.title,
@@ -192,8 +195,16 @@ export function TeacherPage() {
     });
   }
 
-  function cancelTaskEdit() {
+  function openNewTaskForm(lessonId = selectedLessonId) {
+    if (!lessonId) return;
     setEditingTaskId(null);
+    setIsTaskFormOpen(true);
+    setTaskForm(defaultTaskForm(getNextTaskOrder(lessonId), taskForm.type));
+  }
+
+  function closeTaskForm() {
+    setEditingTaskId(null);
+    setIsTaskFormOpen(false);
     setTaskForm(defaultTaskForm(getNextTaskOrder(), taskForm.type));
   }
 
@@ -293,6 +304,7 @@ export function TeacherPage() {
         notify("Задание добавлено");
       }
       await loadCourse(selectedCourseId);
+      setIsTaskFormOpen(false);
       setTaskForm(defaultTaskForm(editingTaskId ? getNextTaskOrder() : taskForm.order_index + 1, taskForm.type));
     } catch (error) {
       notify(error instanceof Error ? error.message : "Не удалось сохранить задание");
@@ -313,6 +325,7 @@ export function TeacherPage() {
       setEditingLessonId(null);
       setEditingTaskId(null);
       setIsLessonFormOpen(false);
+      setIsTaskFormOpen(false);
       setCourseForm(emptyCourse);
       setLessonForm(emptyLesson);
       setIsCourseFormOpen(false);
@@ -589,36 +602,19 @@ export function TeacherPage() {
               )}
 
               {activePanel === "tasks" && (
-                <form className="teacher-panel teacher-form manager-section task-builder" onSubmit={saveTask}>
-                  <PanelTitle icon={<ListChecks size={20} />} title={editingTaskId ? "Редактировать задание" : "Задания"} />
+                <div className="teacher-panel manager-section task-builder">
+                  <div className="section-heading lesson-section-heading">
+                    <PanelTitle icon={<ListChecks size={20} />} title="Задания" />
+                    <button className="secondary-button lesson-add-button" type="button" onClick={() => openNewTaskForm()} disabled={!selectedLessonId}>
+                      <Plus size={18} />
+                      Добавить задание
+                    </button>
+                  </div>
                   <p className="helper-text">Выберите урок, тип задания и заполните только нужные поля. После сохранения задание сразу появится у студентов в этом уроке.</p>
 
                   {!courseDetail.lessons.length && <p className="form-error">Сначала добавьте хотя бы один урок во вкладке "Уроки".</p>}
 
-                  {selectedLessonId && (
-                    <div className="task-editor-list">
-                      {courseDetail.lessons
-                        .find((lesson) => lesson.id === selectedLessonId)
-                        ?.tasks.map((task) => (
-                          <div className={task.id === editingTaskId ? "task-editor-item active" : "task-editor-item"} key={task.id}>
-                            <div>
-                              <span>{task.order_index}. {task.type}</span>
-                              <strong>{task.title}</strong>
-                            </div>
-                            <button className="secondary-button" type="button" onClick={() => editTask(selectedLessonId, task)}>
-                              <Pencil size={18} />
-                              Редактировать
-                            </button>
-                          </div>
-                        )) ?? null}
-                    </div>
-                  )}
-
-                  <div className="builder-step">
-                    <span>1</span>
-                    <strong>Куда добавить</strong>
-                  </div>
-                  <label>
+                  <label className="task-lesson-select">
                     Урок
                     <select
                       value={selectedLessonId ?? ""}
@@ -626,6 +622,8 @@ export function TeacherPage() {
                       onChange={(event) => {
                         const lessonId = Number(event.target.value);
                         setSelectedLessonId(lessonId);
+                        setEditingTaskId(null);
+                        setIsTaskFormOpen(false);
                         setTaskForm(defaultTaskForm(getNextTaskOrder(lessonId), taskForm.type));
                       }}
                       required
@@ -641,73 +639,104 @@ export function TeacherPage() {
                     </select>
                   </label>
 
-                  <div className="builder-step">
-                    <span>2</span>
-                    <strong>Тип задания</strong>
-                  </div>
-                  <div className="task-type-grid">
-                    <TaskTypeButton
-                      active={taskForm.type === "quiz"}
-                      description="Вопрос и несколько вариантов"
-                      label="Квиз"
-                      onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "quiz"))}
-                    />
-                    <TaskTypeButton
-                      active={taskForm.type === "chart"}
-                      description="График, ответ кликом"
-                      label="График"
-                      onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "chart"))}
-                    />
-                    <TaskTypeButton
-                      active={taskForm.type === "rebus"}
-                      description="Ребус и текстовый ответ"
-                      label="Ребус"
-                      onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "rebus"))}
-                    />
-                  </div>
+                  {selectedLessonId && (
+                    <div className="task-editor-list">
+                      {courseDetail.lessons.find((lesson) => lesson.id === selectedLessonId)?.tasks.length ? (
+                        courseDetail.lessons
+                          .find((lesson) => lesson.id === selectedLessonId)
+                          ?.tasks.map((task) => (
+                          <div className={task.id === editingTaskId ? "task-editor-item active" : "task-editor-item"} key={task.id}>
+                            <div>
+                              <span>{task.order_index}. {task.type}</span>
+                              <strong>{task.title}</strong>
+                            </div>
+                            <button className="secondary-button" type="button" onClick={() => editTask(selectedLessonId, task)}>
+                              <Pencil size={18} />
+                              Редактировать
+                            </button>
+                          </div>
+                          ))
+                      ) : (
+                        <div className="empty-state compact">
+                          <ListChecks size={24} />
+                          <strong>Заданий пока нет</strong>
+                          <span>Нажмите "Добавить задание", чтобы создать первое задание для выбранного урока.</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                  <div className="builder-step">
-                    <span>3</span>
-                    <strong>Содержание</strong>
-                  </div>
-                  <Field label="Название" value={taskForm.title} onChange={(value) => setTaskForm({ ...taskForm, title: value })} />
-                  <Textarea label="Вопрос для ученика" value={taskForm.prompt} onChange={(value) => setTaskForm({ ...taskForm, prompt: value })} />
-                  <TaskPayloadFields taskForm={taskForm} setTaskForm={setTaskForm} />
+                  {isTaskFormOpen && (
+                    <form className="teacher-form separated-form" onSubmit={saveTask}>
+                      <h3>{editingTaskId ? "Редактировать задание" : "Добавить задание"}</h3>
 
-                  <div className="builder-step">
-                    <span>4</span>
-                    <strong>Дополнительно</strong>
-                  </div>
-                  <div className="form-row">
-                    <Field
-                      label="Картинка задания"
-                      value={taskForm.image_url ?? ""}
-                      onChange={(value) => setTaskForm({ ...taskForm, image_url: value })}
-                      icon={<Image size={16} />}
-                      required={false}
-                    />
-                    <Field
-                      label="Порядок"
-                      type="number"
-                      value={String(taskForm.order_index)}
-                      onChange={(value) => setTaskForm({ ...taskForm, order_index: Number(value) })}
-                    />
-                  </div>
+                      <div className="builder-step">
+                        <span>1</span>
+                        <strong>Тип задания</strong>
+                      </div>
+                      <div className="task-type-grid">
+                        <TaskTypeButton
+                          active={taskForm.type === "quiz"}
+                          description="Вопрос и несколько вариантов"
+                          label="Квиз"
+                          onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "quiz"))}
+                        />
+                        <TaskTypeButton
+                          active={taskForm.type === "chart"}
+                          description="График, ответ кликом"
+                          label="График"
+                          onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "chart"))}
+                        />
+                        <TaskTypeButton
+                          active={taskForm.type === "rebus"}
+                          description="Ребус и текстовый ответ"
+                          label="Ребус"
+                          onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "rebus"))}
+                        />
+                      </div>
 
-                  <TaskPreview taskForm={taskForm} />
+                      <div className="builder-step">
+                        <span>2</span>
+                        <strong>Содержание</strong>
+                      </div>
+                      <Field label="Название" value={taskForm.title} onChange={(value) => setTaskForm({ ...taskForm, title: value })} />
+                      <Textarea label="Вопрос для ученика" value={taskForm.prompt} onChange={(value) => setTaskForm({ ...taskForm, prompt: value })} />
+                      <TaskPayloadFields taskForm={taskForm} setTaskForm={setTaskForm} />
 
-                  <div className="form-actions">
-                    <button className="primary-button" type="submit" disabled={!selectedLessonId}>
-                      <ListChecks size={18} />
-                      {editingTaskId ? "Сохранить задание" : "Добавить задание"}
-                    </button>
-                    {editingTaskId && (
-                      <button className="secondary-button" type="button" onClick={cancelTaskEdit}>
+                      <div className="builder-step">
+                        <span>3</span>
+                        <strong>Дополнительно</strong>
+                      </div>
+                      <div className="form-row">
+                        <Field
+                          label="Картинка задания"
+                          value={taskForm.image_url ?? ""}
+                          onChange={(value) => setTaskForm({ ...taskForm, image_url: value })}
+                          icon={<Image size={16} />}
+                          required={false}
+                        />
+                        <Field
+                          label="Порядок"
+                          type="number"
+                          value={String(taskForm.order_index)}
+                          onChange={(value) => setTaskForm({ ...taskForm, order_index: Number(value) })}
+                        />
+                      </div>
+
+                      <TaskPreview taskForm={taskForm} />
+
+                      <div className="form-actions">
+                        <button className="primary-button" type="submit" disabled={!selectedLessonId}>
+                          <ListChecks size={18} />
+                          {editingTaskId ? "Сохранить задание" : "Добавить задание"}
+                        </button>
+                        <button className="secondary-button" type="button" onClick={closeTaskForm}>
                         Отмена
                       </button>
-                    )}
-                  </div>
-                </form>
+                      </div>
+                    </form>
+                  )}
+                </div>
               )}
 
               {activePanel === "progress" && (
