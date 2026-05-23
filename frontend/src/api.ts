@@ -19,6 +19,7 @@ import type {
 
 const API_URL = import.meta.env.VITE_API_URL ?? "/api";
 const TOKEN_KEY = "eduhelper_token";
+const MAX_UPLOAD_SIZE_MB = 50;
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -57,6 +58,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 async function upload<T>(path: string, formData: FormData): Promise<T> {
   const token = getToken();
+  if (!token) {
+    throw new Error("Сессия истекла. Войдите снова и повторите загрузку");
+  }
+
   const response = await fetch(`${API_URL}${path}`, {
     method: "POST",
     headers: {
@@ -66,6 +71,15 @@ async function upload<T>(path: string, formData: FormData): Promise<T> {
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("Сессия истекла. Войдите снова и повторите загрузку");
+    }
+    if (response.status === 403) {
+      throw new Error("Загружать картинки может только преподаватель или администратор");
+    }
+    if (response.status === 413) {
+      throw new Error(`Размер картинки не должен превышать ${MAX_UPLOAD_SIZE_MB} МБ`);
+    }
     const errorBody = await response.json().catch(() => ({ detail: "Ошибка загрузки" }));
     throw new Error(formatApiError(errorBody));
   }
@@ -190,6 +204,10 @@ export const api = {
     });
   },
   async uploadImage(file: File): Promise<{ url: string }> {
+    if (file.size > MAX_UPLOAD_SIZE_MB * 1024 * 1024) {
+      throw new Error(`Размер картинки не должен превышать ${MAX_UPLOAD_SIZE_MB} МБ`);
+    }
+
     const formData = new FormData();
     formData.append("file", file);
     const uploaded = await upload<{ url: string }>("/uploads/images", formData);

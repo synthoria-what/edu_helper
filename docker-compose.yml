@@ -11,6 +11,7 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-120}
       CORS_ORIGINS: ${CORS_ORIGINS:-https://eduhelper.synthori.space,http://localhost,http://127.0.0.1}
       UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-50}
     volumes:
       - ./uploads:/app/uploads
     healthcheck:

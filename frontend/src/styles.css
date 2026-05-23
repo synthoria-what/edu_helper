@@ -1458,9 +1458,19 @@ select {
   padding-left: 38px;
 }
 
-.image-upload-field {
+.image-url-upload-field {
   display: grid;
   gap: 10px;
+  color: #465451;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.image-url-upload-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
 }
 
 .file-picker {
@@ -1680,6 +1690,7 @@ select {
   .option-editor-row,
   .option-editor-row:has(input + input),
   .upload-preview,
+  .image-url-upload-row,
   .task-editor-item,
   .admin-user-card {
     grid-template-columns: 1fr;

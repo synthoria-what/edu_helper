@@ -430,12 +430,11 @@ export function TeacherPage() {
                   value={String(courseForm.duration_minutes)}
                   onChange={(value) => setCourseForm({ ...courseForm, duration_minutes: Number(value) })}
                 />
-                <Field
+                <ImageUrlUploadField
                   label="Картинка курса"
-                  value={courseForm.image_url ?? ""}
+                  imageUrl={courseForm.image_url ?? ""}
                   onChange={(value) => setCourseForm({ ...courseForm, image_url: value })}
-                  icon={<Image size={16} />}
-                  required={false}
+                  onError={notify}
                 />
               </div>
               <div className="form-actions">
@@ -575,19 +574,13 @@ export function TeacherPage() {
                           icon={<Video size={16} />}
                           required={false}
                         />
-                        <Field
+                        <ImageUrlUploadField
                           label="Картинка урока"
-                          value={lessonForm.image_url ?? ""}
+                          imageUrl={lessonForm.image_url ?? ""}
                           onChange={(value) => setLessonForm({ ...lessonForm, image_url: value })}
-                          icon={<Image size={16} />}
-                          required={false}
+                          onError={notify}
                         />
                       </div>
-                      <ImageUploadField
-                        imageUrl={lessonForm.image_url ?? ""}
-                        onChange={(value) => setLessonForm({ ...lessonForm, image_url: value })}
-                        onError={notify}
-                      />
                       <Field
                         label="Порядок"
                         type="number"
@@ -898,11 +891,13 @@ function Textarea({ label, value, onChange }: { label: string; value: string; on
   );
 }
 
-function ImageUploadField({
+function ImageUrlUploadField({
+  label,
   imageUrl,
   onChange,
   onError,
 }: {
+  label: string;
   imageUrl: string;
   onChange: (value: string) => void;
   onError: (message: string) => void;
@@ -923,17 +918,24 @@ function ImageUploadField({
   }
 
   return (
-    <div className="image-upload-field">
-      <label className="file-picker">
-        <Upload size={18} />
-        <span>{isUploading ? "Загружаем..." : "Загрузить картинку файлом"}</span>
-        <input
-          accept="image/gif,image/jpeg,image/png,image/webp"
-          disabled={isUploading}
-          type="file"
-          onChange={(event) => void uploadSelectedFile(event.target.files?.[0])}
-        />
-      </label>
+    <div className="image-url-upload-field">
+      <span>{label}</span>
+      <div className="image-url-upload-row">
+        <span className="input-with-icon">
+          <Image size={16} />
+          <input value={imageUrl} onChange={(event) => onChange(event.target.value)} />
+        </span>
+        <label className="file-picker">
+          <Upload size={18} />
+          <span>{isUploading ? "Загружаем..." : "Файл"}</span>
+          <input
+            accept="image/gif,image/jpeg,image/png,image/webp"
+            disabled={isUploading}
+            type="file"
+            onChange={(event) => void uploadSelectedFile(event.target.files?.[0])}
+          />
+        </label>
+      </div>
       {imageUrl && (
         <div className="upload-preview">
           <img src={imageUrl} alt="" />
