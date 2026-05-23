@@ -401,9 +401,10 @@ select {
 .task-image {
   display: block;
   width: 100%;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 8px;
   border: 1px solid rgba(47, 111, 106, 0.16);
+  background: #f8fffc;
 }
 
 .course-card-image {
@@ -1529,8 +1530,8 @@ select {
   height: 76px;
   border: 1px solid #d8ddd7;
   border-radius: 8px;
-  object-fit: cover;
-  background: #fff;
+  object-fit: contain;
+  background: #f8fffc;
 }
 
 .teacher-list {

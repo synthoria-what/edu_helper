@@ -699,12 +699,11 @@ export function TeacherPage() {
                         <strong>Дополнительно</strong>
                       </div>
                       <div className="form-row">
-                        <Field
+                        <ImageUrlUploadField
                           label="Картинка задания"
-                          value={taskForm.image_url ?? ""}
+                          imageUrl={taskForm.image_url ?? ""}
                           onChange={(value) => setTaskForm({ ...taskForm, image_url: value })}
-                          icon={<Image size={16} />}
-                          required={false}
+                          onError={notify}
                         />
                         <Field
                           label="Порядок"
