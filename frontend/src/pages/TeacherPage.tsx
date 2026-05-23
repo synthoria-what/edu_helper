@@ -1180,12 +1180,52 @@ function RichTextEditor({
     }
   }
 
-  function restoreSelection() {
+  function restoreSelection(): boolean {
+    const editor = editorRef.current;
     const selection = window.getSelection();
-    if (!selectionRef.current || !selection) return;
+    if (!editor || !selectionRef.current || !selection) return false;
 
+    try {
+      if (!editor.contains(selectionRef.current.commonAncestorContainer)) {
+        return false;
+      }
+      selection.removeAllRanges();
+      selection.addRange(selectionRef.current);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function placeCaretAtEnd() {
+    const editor = editorRef.current;
+    const selection = window.getSelection();
+    if (!editor || !selection) return;
+
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
     selection.removeAllRanges();
-    selection.addRange(selectionRef.current);
+    selection.addRange(range);
+    selectionRef.current = range.cloneRange();
+  }
+
+  function ensureEditorSelection() {
+    const editor = editorRef.current;
+    const selection = window.getSelection();
+    editor?.focus();
+
+    if (editor && selection?.rangeCount) {
+      const range = selection.getRangeAt(0);
+      if (editor.contains(range.commonAncestorContainer)) {
+        selectionRef.current = range.cloneRange();
+        return;
+      }
+    }
+
+    if (!restoreSelection()) {
+      placeCaretAtEnd();
+    }
   }
 
   function syncValue() {
@@ -1196,8 +1236,7 @@ function RichTextEditor({
   }
 
   function command(name: string, commandValue?: string) {
-    editorRef.current?.focus();
-    restoreSelection();
+    ensureEditorSelection();
     document.execCommand("styleWithCSS", false, "false");
     document.execCommand(name, false, commandValue);
     syncValue();
