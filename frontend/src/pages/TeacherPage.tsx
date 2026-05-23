@@ -1161,9 +1161,20 @@ function RichTextEditor({
 
   useEffect(() => {
     const editor = editorRef.current;
-    if (!editor || value === lastHtmlRef.current || value === editor.innerHTML) {
+    if (!editor) {
       return;
     }
+
+    const nextValue = value || "";
+    if (nextValue === editor.innerHTML) {
+      lastHtmlRef.current = nextValue;
+      return;
+    }
+
+    if (nextValue === lastHtmlRef.current && editor.innerHTML) {
+      return;
+    }
+
     editor.innerHTML = value || "";
     lastHtmlRef.current = value || "";
   }, [value]);
@@ -1311,7 +1322,6 @@ function RichTextEditor({
         aria-label={label}
         contentEditable
         data-placeholder="Напишите описание курса здесь"
-        dangerouslySetInnerHTML={{ __html: lastHtmlRef.current }}
         onBlur={() => {
           saveSelection();
           syncValue();
