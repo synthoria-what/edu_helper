@@ -8,9 +8,12 @@ import { Layout } from "../components/Layout";
 import { formatCoursePrice, formatTaskCount } from "../format";
 import type { Certificate, CompletedTask, CourseListItem, ProgressSummary } from "../types";
 
+const COURSES_PER_PAGE = 6;
+
 export function DashboardPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
+  const ownerId = searchParams.get("owner_id") ?? "";
   const [courses, setCourses] = useState<CourseListItem[]>([]);
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
@@ -19,26 +22,40 @@ export function DashboardPage() {
   const [priceFilter, setPriceFilter] = useState("");
   const [directionFilter, setDirectionFilter] = useState("");
   const [levelFilter, setLevelFilter] = useState("");
+  const [page, setPage] = useState(1);
   const [error, setError] = useState("");
 
-  async function loadDashboard(filters: { q?: string; price?: string; direction?: string; level?: string; owner_id?: string } = { q: query, price: priceFilter, direction: directionFilter, level: levelFilter }) {
+  async function loadDashboard(
+    filters: { q?: string; price?: string; direction?: string; level?: string; owner_id?: string } = {
+      q: query,
+      price: priceFilter,
+      direction: directionFilter,
+      level: levelFilter,
+      owner_id: ownerId,
+    },
+  ) {
     Promise.all([api.courses(filters), api.progress(), api.certificates(), api.completedTasks()])
       .then(([coursesResponse, progressResponse, certificateResponse, completedTaskResponse]) => {
         setCourses(coursesResponse);
         setSummary(progressResponse);
         setCertificates(certificateResponse);
         setCompletedTasks(completedTaskResponse);
+        setPage(1);
       })
       .catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Не удалось загрузить данные"));
   }
 
   useEffect(() => {
-    const ownerId = searchParams.get("owner_id") ?? "";
     void loadDashboard({ q: "", price: "", direction: "", level: "", owner_id: ownerId });
   }, [searchParams]);
 
   const directions = useMemo(() => Array.from(new Set(courses.map((course) => course.direction))).sort(), [courses]);
   const levels = useMemo(() => Array.from(new Set(courses.map((course) => course.level))).sort(), [courses]);
+  const totalPages = Math.max(1, Math.ceil(courses.length / COURSES_PER_PAGE));
+  const pageCourses = useMemo(
+    () => courses.slice((page - 1) * COURSES_PER_PAGE, page * COURSES_PER_PAGE),
+    [courses, page],
+  );
 
   function submitSearch(event: FormEvent) {
     event.preventDefault();
@@ -50,7 +67,7 @@ export function DashboardPage() {
     setPriceFilter("");
     setDirectionFilter("");
     setLevelFilter("");
-    void loadDashboard({ q: "", price: "", direction: "", level: "" });
+    void loadDashboard({ q: "", price: "", direction: "", level: "", owner_id: ownerId });
   }
 
   return (
@@ -102,7 +119,7 @@ export function DashboardPage() {
         </form>
         <div className="course-grid">
           {courses.length ? (
-            courses.map((course) => (
+            pageCourses.map((course) => (
               <article className="course-card" key={course.id}>
                 <div
                   className={course.image_url ? "course-card-media" : "course-card-media course-card-media--empty"}
@@ -148,6 +165,19 @@ export function DashboardPage() {
             </div>
           )}
         </div>
+        {courses.length > COURSES_PER_PAGE && (
+          <div className="pagination">
+            <button className="secondary-button" type="button" disabled={page === 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>
+              Назад
+            </button>
+            <span>
+              Страница {page} из {totalPages}
+            </span>
+            <button className="secondary-button" type="button" disabled={page === totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>
+              Вперёд
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="content-section progress-history-section">
