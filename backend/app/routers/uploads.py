@@ -6,25 +6,18 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
 from app.config import get_settings
 from app.dependencies import get_current_user
-from app.models import User, UserRole
+from app.models import User
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 
 
-def require_editor(user: User) -> None:
-    if user.role not in {UserRole.teacher, UserRole.admin}:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Доступно только преподавателю или администратору")
-
-
 @router.post("/images", status_code=status.HTTP_201_CREATED)
 async def upload_image(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(get_current_user),
 ) -> dict[str, str]:
-    require_editor(current_user)
-
     content_type = file.content_type or mimetypes.guess_type(file.filename or "")[0]
     if content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="Загрузите изображение JPG, PNG, WebP или GIF")

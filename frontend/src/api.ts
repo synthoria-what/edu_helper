@@ -75,7 +75,7 @@ async function upload<T>(path: string, formData: FormData): Promise<T> {
       throw new Error("Сессия истекла. Войдите снова и повторите загрузку");
     }
     if (response.status === 403) {
-      throw new Error("Загружать картинки может только преподаватель или администратор");
+      throw new Error("Нет прав на загрузку картинки");
     }
     if (response.status === 413) {
       throw new Error(`Размер картинки не должен превышать ${MAX_UPLOAD_SIZE_MB} МБ`);
@@ -163,6 +163,9 @@ export const api = {
   },
   async courses(): Promise<CourseListItem[]> {
     return request<CourseListItem[]>("/courses");
+  },
+  async myCourses(): Promise<CourseListItem[]> {
+    return request<CourseListItem[]>("/courses/mine");
   },
   async course(id: string): Promise<CourseDetail> {
     return request<CourseDetail>(`/courses/${id}`);

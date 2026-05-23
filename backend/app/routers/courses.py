@@ -30,9 +30,13 @@ def normalize_answer(value: str) -> str:
     return value.strip().casefold()
 
 
-def require_course_editor(user: User) -> None:
-    if user.role not in {UserRole.teacher, UserRole.admin}:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Доступно только преподавателю или администратору")
+def can_edit_course(course: Course, user: User) -> bool:
+    return user.role == UserRole.admin or course.owner_id == user.id
+
+
+def require_course_editor(course: Course, user: User) -> None:
+    if not can_edit_course(course, user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Можно редактировать только свои курсы")
 
 
 def build_certificate_read(certificate: Certificate) -> CertificateRead:
@@ -93,6 +97,7 @@ async def build_course_list_item(session: AsyncSession, course: Course, user: Us
         direction=course.direction,
         level=course.level,
         duration_minutes=course.duration_minutes,
+        price_rubles=course.price_rubles,
         image_url=course.image_url,
         total_tasks=total_tasks,
         completed_tasks=completed_tasks,
@@ -108,9 +113,6 @@ async def get_course_or_404(session: AsyncSession, course_id: int) -> Course:
 
 
 async def assert_task_is_unlocked(session: AsyncSession, task_id: int, user: User) -> None:
-    if user.role in {UserRole.teacher, UserRole.admin}:
-        return
-
     course_id = await session.scalar(select(Lesson.course_id).join(Task).where(Task.id == task_id))
     if course_id is None:
         raise HTTPException(status_code=404, detail="Задание не найдено")
@@ -120,6 +122,8 @@ async def assert_task_is_unlocked(session: AsyncSession, task_id: int, user: Use
     )
     if not course:
         raise HTTPException(status_code=404, detail="Курс не найден")
+    if can_edit_course(course, user):
+        return
 
     ordered_tasks = [
         task
@@ -152,14 +156,25 @@ async def list_courses(
     return [await build_course_list_item(session, course, current_user) for course in courses]
 
 
+@router.get("/mine", response_model=list[CourseListItem])
+async def list_my_courses(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[CourseListItem]:
+    query = select(Course).order_by(Course.id)
+    if current_user.role != UserRole.admin:
+        query = query.where(Course.owner_id == current_user.id)
+    courses = (await session.scalars(query)).all()
+    return [await build_course_list_item(session, course, current_user) for course in courses]
+
+
 @router.post("", response_model=CourseListItem, status_code=status.HTTP_201_CREATED)
 async def create_course(
     payload: CourseMutation,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> CourseListItem:
-    require_course_editor(current_user)
-    course = Course(**payload.model_dump())
+    course = Course(**payload.model_dump(), owner_id=current_user.id)
     session.add(course)
     await session.commit()
     await session.refresh(course)
@@ -173,8 +188,8 @@ async def update_course(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> CourseListItem:
-    require_course_editor(current_user)
     course = await get_course_or_404(session, course_id)
+    require_course_editor(course, current_user)
     for field, value in payload.model_dump().items():
         setattr(course, field, value)
     await session.commit()
@@ -188,8 +203,8 @@ async def delete_course(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> None:
-    require_course_editor(current_user)
-    await get_course_or_404(session, course_id)
+    course = await get_course_or_404(session, course_id)
+    require_course_editor(course, current_user)
 
     lesson_ids = select(Lesson.id).where(Lesson.course_id == course_id)
     task_ids = select(Task.id).where(Task.lesson_id.in_(lesson_ids))
@@ -209,8 +224,8 @@ async def create_lesson(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> LessonRead:
-    require_course_editor(current_user)
-    await get_course_or_404(session, course_id)
+    course = await get_course_or_404(session, course_id)
+    require_course_editor(course, current_user)
     lesson = Lesson(course_id=course_id, **payload.model_dump())
     session.add(lesson)
     await session.commit()
@@ -233,12 +248,13 @@ async def update_lesson(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> LessonRead:
-    require_course_editor(current_user)
     lesson = await session.scalar(
         select(Lesson).where(Lesson.id == lesson_id).options(selectinload(Lesson.tasks))
     )
     if not lesson:
         raise HTTPException(status_code=404, detail="Урок не найден")
+    course = await get_course_or_404(session, lesson.course_id)
+    require_course_editor(course, current_user)
     for field, value in payload.model_dump().items():
         setattr(lesson, field, value)
     await session.commit()
@@ -252,10 +268,11 @@ async def delete_lesson(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> None:
-    require_course_editor(current_user)
     lesson = await session.scalar(select(Lesson).where(Lesson.id == lesson_id))
     if not lesson:
         raise HTTPException(status_code=404, detail="Урок не найден")
+    course = await get_course_or_404(session, lesson.course_id)
+    require_course_editor(course, current_user)
 
     task_ids = select(Task.id).where(Task.lesson_id == lesson_id)
     await session.execute(delete(TaskResult).where(TaskResult.task_id.in_(task_ids)))
@@ -271,10 +288,11 @@ async def create_task(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> TaskRead:
-    require_course_editor(current_user)
     lesson = await session.scalar(select(Lesson).where(Lesson.id == lesson_id))
     if not lesson:
         raise HTTPException(status_code=404, detail="Урок не найден")
+    course = await get_course_or_404(session, lesson.course_id)
+    require_course_editor(course, current_user)
     task = Task(lesson_id=lesson_id, **payload.model_dump())
     session.add(task)
     await session.commit()
@@ -289,10 +307,14 @@ async def update_task(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> TaskRead:
-    require_course_editor(current_user)
     task = await session.scalar(select(Task).where(Task.id == task_id))
     if not task:
         raise HTTPException(status_code=404, detail="Задание не найдено")
+    course_id = await session.scalar(select(Lesson.course_id).where(Lesson.id == task.lesson_id))
+    if course_id is None:
+        raise HTTPException(status_code=404, detail="Урок не найден")
+    course = await get_course_or_404(session, course_id)
+    require_course_editor(course, current_user)
     for field, value in payload.model_dump().items():
         setattr(task, field, value)
     await session.commit()
@@ -306,10 +328,14 @@ async def delete_task(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> None:
-    require_course_editor(current_user)
     task = await session.scalar(select(Task).where(Task.id == task_id))
     if not task:
         raise HTTPException(status_code=404, detail="Задание не найдено")
+    course_id = await session.scalar(select(Lesson.course_id).where(Lesson.id == task.lesson_id))
+    if course_id is None:
+        raise HTTPException(status_code=404, detail="Урок не найден")
+    course = await get_course_or_404(session, course_id)
+    require_course_editor(course, current_user)
 
     await session.execute(delete(TaskResult).where(TaskResult.task_id == task_id))
     await session.execute(delete(Task).where(Task.id == task_id))
@@ -322,10 +348,10 @@ async def course_students_progress(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[CourseProgressStudent]:
-    require_course_editor(current_user)
-    await get_course_or_404(session, course_id)
+    course = await get_course_or_404(session, course_id)
+    require_course_editor(course, current_user)
     students = (
-        await session.scalars(select(User).where(User.role == UserRole.student).order_by(User.full_name))
+        await session.scalars(select(User).where(User.role != UserRole.admin).order_by(User.full_name))
     ).all()
 
     rows: list[CourseProgressStudent] = []
@@ -384,7 +410,7 @@ async def get_course(
     )
     results_by_task = {result.task_id: result for result in result_rows.all()}
 
-    include_answers = current_user.role in {UserRole.teacher, UserRole.admin}
+    include_answers = can_edit_course(course, current_user)
     lessons = [
         LessonRead(
             id=lesson.id,

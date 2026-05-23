@@ -1,4 +1,4 @@
-import { ShieldCheck, Users, UserRoundCog } from "lucide-react";
+import { ShieldCheck, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { api } from "../api";
@@ -48,8 +48,8 @@ export function AdminPage() {
   }
 
   const visibleUsers = users.filter((item) => filter === "all" || item.role === filter);
-  const teachersCount = users.filter((item) => item.role === "teacher").length;
   const studentsCount = users.filter((item) => item.role === "student").length;
+  const adminsCount = users.filter((item) => item.role === "admin").length;
 
   return (
     <Layout>
@@ -57,12 +57,12 @@ export function AdminPage() {
         <div>
           <span className="eyebrow">Роль администратора</span>
           <h1>Управление аккаунтами и ролями</h1>
-          <p>Здесь видны студенты, преподаватели и администраторы. Роль можно менять прямо в списке.</p>
+          <p>Здесь видны пользователи и администраторы. Роль можно менять прямо в списке.</p>
         </div>
         <div className="summary-strip">
           <SummaryCard icon={<Users size={20} />} label="Всего" value={users.length} />
-          <SummaryCard icon={<UserRoundCog size={20} />} label="Преподаватели" value={teachersCount} />
-          <SummaryCard icon={<ShieldCheck size={20} />} label="Студенты" value={studentsCount} />
+          <SummaryCard icon={<Users size={20} />} label="Пользователи" value={studentsCount} />
+          <SummaryCard icon={<ShieldCheck size={20} />} label="Админы" value={adminsCount} />
         </div>
       </section>
 
@@ -78,14 +78,7 @@ export function AdminPage() {
             type="button"
             onClick={() => setFilter("student")}
           >
-            Студенты
-          </button>
-          <button
-            className={filter === "teacher" ? "filter-chip active" : "filter-chip"}
-            type="button"
-            onClick={() => setFilter("teacher")}
-          >
-            Преподаватели
+            Пользователи
           </button>
           <button
             className={filter === "admin" ? "filter-chip active" : "filter-chip"}
@@ -113,8 +106,7 @@ export function AdminPage() {
                       onChange={(event) => void changeRole(item.id, event.target.value as UserRole)}
                       disabled={isCurrentAdmin}
                     >
-                      <option value="student">Студент</option>
-                      <option value="teacher">Преподаватель</option>
+                      <option value="student">Пользователь</option>
                       <option value="admin">Администратор</option>
                     </select>
                   </div>

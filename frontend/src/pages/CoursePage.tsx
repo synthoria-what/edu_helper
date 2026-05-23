@@ -5,7 +5,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import { InteractiveTask } from "../components/InteractiveTask";
 import { Layout } from "../components/Layout";
-import { formatTaskCount } from "../format";
+import { formatCoursePrice, formatTaskCount } from "../format";
 import { getEmbedVideoUrl } from "../video";
 import type { CourseDetail, Task } from "../types";
 
@@ -99,6 +99,7 @@ export function CoursePage() {
             </div>
             <div className="progress-widget">
               <strong>{course.progress_percent}%</strong>
+              <span>{formatCoursePrice(course.price_rubles)}</span>
               <span>
                 {course.completed_tasks}/{formatTaskCount(course.total_tasks)}
               </span>
@@ -137,7 +138,7 @@ export function CoursePage() {
                   <div className="empty-state compact">
                     <BookOpen size={24} />
                     <strong>Модулей пока нет</strong>
-                    <span>Преподаватель еще не добавил уроки в этот курс.</span>
+                    <span>Автор еще не добавил уроки в этот курс.</span>
                   </div>
                 )}
               </div>
@@ -217,7 +218,7 @@ export function CoursePage() {
                 <div className="student-module-copy">
                   <span>Курс в подготовке</span>
                   <h2>Материалы еще не добавлены</h2>
-                  <p>Как только преподаватель создаст первый модуль, он появится здесь вместе с заданиями.</p>
+                  <p>Как только автор создаст первый модуль, он появится здесь вместе с заданиями.</p>
                 </div>
               </section>
             )}

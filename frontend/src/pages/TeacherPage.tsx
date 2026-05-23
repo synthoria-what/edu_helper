@@ -17,9 +17,8 @@ import {
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { api } from "../api";
-import { useAuth } from "../auth";
 import { Layout } from "../components/Layout";
-import { formatTaskCount } from "../format";
+import { formatCoursePrice, formatTaskCount } from "../format";
 import { normalizeVideoUrl } from "../video";
 import type {
   CourseDetail,
@@ -45,6 +44,7 @@ const emptyCourse: CourseMutation = {
   direction: "Общие компетенции",
   level: "Базовый",
   duration_minutes: 45,
+  price_rubles: 0,
   image_url: "",
 };
 
@@ -57,7 +57,6 @@ const emptyLesson: LessonMutation = {
 };
 
 export function TeacherPage() {
-  const { user } = useAuth();
   const [courses, setCourses] = useState<CourseListItem[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
   const [courseDetail, setCourseDetail] = useState<CourseDetail | null>(null);
@@ -74,10 +73,8 @@ export function TeacherPage() {
   const [isCourseFormOpen, setIsCourseFormOpen] = useState(false);
   const [activePanel, setActivePanel] = useState<ManagerPanel>("lessons");
 
-  const canEdit = user?.role === "teacher" || user?.role === "admin";
-
   async function loadCourses(preferredCourseId?: number | null) {
-    const loadedCourses = await api.courses();
+    const loadedCourses = await api.myCourses();
     setCourses(loadedCourses);
     if (preferredCourseId !== undefined) {
       setSelectedCourseId(preferredCourseId ?? null);
@@ -121,6 +118,7 @@ export function TeacherPage() {
         direction: courseDetail.direction,
         level: courseDetail.level,
         duration_minutes: courseDetail.duration_minutes,
+        price_rubles: courseDetail.price_rubles,
         image_url: courseDetail.image_url ?? "",
       });
     } else {
@@ -142,6 +140,7 @@ export function TeacherPage() {
       direction: detail.direction,
       level: detail.level,
       duration_minutes: detail.duration_minutes,
+      price_rubles: detail.price_rubles,
       image_url: detail.image_url ?? "",
     });
     setLessonForm({ ...emptyLesson, order_index: detail.lessons.length + 1 });
@@ -243,14 +242,6 @@ export function TeacherPage() {
     if (!students.length) return 0;
     return Math.round(students.reduce((sum, student) => sum + student.progress_percent, 0) / students.length);
   }, [students]);
-
-  if (!canEdit) {
-    return (
-      <Layout>
-        <div className="screen-loader">Кабинет доступен преподавателю или администратору</div>
-      </Layout>
-    );
-  }
 
   async function saveCourse(event: FormEvent) {
     event.preventDefault();
@@ -373,7 +364,7 @@ export function TeacherPage() {
     const task = courseDetail?.lessons.flatMap((lesson) => lesson.tasks).find((item) => item.id === taskId);
     if (!task) return;
 
-    const shouldDelete = window.confirm(`Удалить задание "${task.title}"? Прогресс студентов по нему тоже будет удален.`);
+    const shouldDelete = window.confirm(`Удалить задание "${task.title}"? Прогресс участников по нему тоже будет удален.`);
     if (!shouldDelete) return;
 
     try {
@@ -394,13 +385,13 @@ export function TeacherPage() {
     <Layout>
       <section className="dashboard-hero">
         <div>
-          <span className="eyebrow">Роль преподавателя</span>
-          <h1>Создание курсов, заданий и отслеживание прогресса</h1>
-          <p>Добавляйте уроки, картинки, видео-ссылки и задания без технических настроек.</p>
+          <span className="eyebrow">Авторский кабинет</span>
+          <h1>Мои курсы, задания и прогресс участников</h1>
+          <p>Создавайте курсы в формате Stepik: уроки, материалы, задания и карточка с ценой.</p>
         </div>
         <div className="summary-strip">
           <SummaryBox icon={<BookPlus size={20} />} label="Курсы" value={courses.length} />
-          <SummaryBox icon={<UsersRound size={20} />} label="Студенты" value={students.length} />
+          <SummaryBox icon={<UsersRound size={20} />} label="Участники" value={students.length} />
           <SummaryBox icon={<BarChart3 size={20} />} label="Средний прогресс" value={`${totalProgress}%`} />
         </div>
       </section>
@@ -417,7 +408,7 @@ export function TeacherPage() {
           <div className="section-heading">
             <div>
               <h2>Курсы</h2>
-              <span>Сначала выберите курс или создайте новый</span>
+              <span>Здесь видны только ваши курсы</span>
             </div>
             <button className="primary-button" type="button" onClick={openNewCourseForm}>
               <Plus size={18} />
@@ -437,7 +428,7 @@ export function TeacherPage() {
                   <strong>{course.title}</strong>
                   <span>{course.direction}</span>
                   <small>
-                    {formatTaskCount(course.total_tasks)} · {course.duration_minutes} мин.
+                    {formatTaskCount(course.total_tasks)} · {course.duration_minutes} мин. · {formatCoursePrice(course.price_rubles)}
                   </small>
                 </button>
               ))
@@ -477,6 +468,14 @@ export function TeacherPage() {
                   value={String(courseForm.duration_minutes)}
                   onChange={(value) => setCourseForm({ ...courseForm, duration_minutes: Number(value) })}
                 />
+                <Field
+                  label="Цена, ₽"
+                  type="number"
+                  value={String(courseForm.price_rubles)}
+                  onChange={(value) => setCourseForm({ ...courseForm, price_rubles: Number(value) })}
+                />
+              </div>
+              <div className="form-row">
                 <ImageUrlUploadField
                   label="Картинка курса"
                   imageUrl={courseForm.image_url ?? ""}
@@ -503,7 +502,7 @@ export function TeacherPage() {
                 <div>
                   <span>1</span>
                   <strong>Выберите курс слева</strong>
-                  <p>Откроются отдельные разделы: уроки, задания и прогресс студентов.</p>
+                  <p>Откроются отдельные разделы: уроки, задания и прогресс участников.</p>
                 </div>
                 <div>
                   <span>2</span>
@@ -540,7 +539,8 @@ export function TeacherPage() {
                 <div className="summary-strip compact">
                   <SummaryBox icon={<Video size={20} />} label="Уроки" value={courseDetail.lessons.length} />
                   <SummaryBox icon={<ListChecks size={20} />} label="Задания" value={courseDetail.total_tasks} />
-                  <SummaryBox icon={<UsersRound size={20} />} label="Студенты" value={students.length} />
+                  <SummaryBox icon={<BookPlus size={20} />} label="Цена" value={formatCoursePrice(courseDetail.price_rubles)} />
+                  <SummaryBox icon={<UsersRound size={20} />} label="Участники" value={students.length} />
                 </div>
               </div>
 
@@ -618,7 +618,7 @@ export function TeacherPage() {
                       Добавить задание
                     </button>
                   </div>
-                  <p className="helper-text">Выберите урок, тип задания и заполните только нужные поля. После сохранения задание сразу появится у студентов в этом уроке.</p>
+                  <p className="helper-text">Выберите урок, тип задания и заполните только нужные поля. После сохранения задание сразу появится у пользователей в этом уроке.</p>
 
                   {!courseDetail.lessons.length && <p className="form-error">Сначала добавьте хотя бы один урок во вкладке "Уроки".</p>}
 
@@ -675,8 +675,8 @@ export function TeacherPage() {
 
               {activePanel === "progress" && (
                 <div className="teacher-panel manager-section progress-panel">
-                  <PanelTitle icon={<UsersRound size={20} />} title="Прогресс студентов" />
-                  {!students.length && <p className="helper-text">Когда студенты начнут проходить курс, здесь появятся выполненные задания и сертификаты.</p>}
+                  <PanelTitle icon={<UsersRound size={20} />} title="Прогресс участников" />
+                  {!students.length && <p className="helper-text">Когда пользователи начнут проходить курс, здесь появятся выполненные задания и сертификаты.</p>}
                   {students.map((student) => (
                     <div className="student-progress" key={student.user_id}>
                       <div>

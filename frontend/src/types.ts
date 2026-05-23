@@ -2,7 +2,7 @@ export type User = {
   id: string;
   full_name: string;
   email: string;
-  role: "student" | "teacher" | "admin";
+  role: "student" | "admin";
 };
 
 export type UserRole = User["role"];
@@ -52,6 +52,7 @@ export type CourseListItem = {
   direction: string;
   level: string;
   duration_minutes: number;
+  price_rubles: number;
   image_url: string | null;
   total_tasks: number;
   completed_tasks: number;
@@ -100,6 +101,7 @@ export type CourseMutation = {
   direction: string;
   level: string;
   duration_minutes: number;
+  price_rubles: number;
   image_url?: string | null;
 };
 

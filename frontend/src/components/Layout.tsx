@@ -22,12 +22,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <span>EduHelper</span>
         </Link>
         <div className="topbar-actions">
-          {(user?.role === "teacher" || user?.role === "admin") && (
-            <Link className="topbar-link" to="/teacher">
-              <PencilRuler size={16} />
-              Кабинет преподавателя
-            </Link>
-          )}
+          <Link className="topbar-link" to="/my-courses">
+            <PencilRuler size={16} />
+            Мои курсы
+          </Link>
           {user?.role === "admin" && (
             <Link className="topbar-link" to="/admin">
               <ShieldCheck size={16} />

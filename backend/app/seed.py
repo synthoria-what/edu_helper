@@ -1,4 +1,4 @@
-from sqlalchemy import text, select
+from sqlalchemy import text, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Course, Lesson, Task, TaskType, User, UserRole
@@ -6,21 +6,25 @@ from app.security import get_password_hash
 
 
 async def seed_demo_data(session: AsyncSession) -> None:
-    await ensure_media_columns(session)
-    await ensure_user_role_enum(session)
+    await ensure_course_columns(session)
     await seed_demo_users(session)
+    await normalize_legacy_teacher_roles(session)
+    await backfill_course_owners(session)
 
     existing_course = await session.scalar(select(Course).limit(1))
     if existing_course:
         return
 
+    owner_id = await get_default_course_owner_id(session)
     course = Course(
         title="Цифровая грамотность студента",
         description="Короткий курс о безопасной работе с информацией, учебными сервисами и данными.",
         direction="Общие компетенции",
         level="Базовый",
         duration_minutes=55,
+        price_rubles=0,
         image_url="https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1200&q=80",
+        owner_id=owner_id,
         lessons=[
             Lesson(
                 title="Информационная безопасность",
@@ -97,23 +101,42 @@ async def seed_demo_data(session: AsyncSession) -> None:
     await session.commit()
 
 
-async def ensure_media_columns(session: AsyncSession) -> None:
+async def ensure_course_columns(session: AsyncSession) -> None:
     bind = session.get_bind()
     if bind.dialect.name != "postgresql":
         return
 
     await session.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS image_url VARCHAR(500)"))
+    await session.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS price_rubles INTEGER NOT NULL DEFAULT 0"))
+    await session.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES users(id) ON DELETE SET NULL"))
     await session.execute(text("ALTER TABLE lessons ADD COLUMN IF NOT EXISTS image_url VARCHAR(500)"))
     await session.execute(text("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS image_url VARCHAR(500)"))
     await session.commit()
 
 
-async def ensure_user_role_enum(session: AsyncSession) -> None:
+async def normalize_legacy_teacher_roles(session: AsyncSession) -> None:
     bind = session.get_bind()
-    if bind.dialect.name != "postgresql":
+    if bind.dialect.name == "postgresql":
+        await session.execute(text("UPDATE users SET role = 'student' WHERE role::text = 'teacher'"))
+    else:
+        await session.execute(text("UPDATE users SET role = 'student' WHERE role = 'teacher'"))
+    await session.commit()
+
+
+async def get_default_course_owner_id(session: AsyncSession):
+    owner = await session.scalar(select(User).where(User.role == UserRole.admin).order_by(User.created_at))
+    if owner:
+        return owner.id
+    owner = await session.scalar(select(User).order_by(User.created_at))
+    return owner.id if owner else None
+
+
+async def backfill_course_owners(session: AsyncSession) -> None:
+    owner_id = await get_default_course_owner_id(session)
+    if not owner_id:
         return
 
-    await session.execute(text("ALTER TYPE userrole ADD VALUE IF NOT EXISTS 'teacher'"))
+    await session.execute(update(Course).where(Course.owner_id.is_(None)).values(owner_id=owner_id))
     await session.commit()
 
 
@@ -126,13 +149,7 @@ async def seed_demo_users(session: AsyncSession) -> None:
             "role": UserRole.admin,
         },
         {
-            "full_name": "Преподаватель Демонстрационный",
-            "email": "teacher@example.com",
-            "password": "teacher123",
-            "role": UserRole.teacher,
-        },
-        {
-            "full_name": "Студент Демонстрационный",
+            "full_name": "Пользователь Демонстрационный",
             "email": "student@example.com",
             "password": "student123",
             "role": UserRole.student,

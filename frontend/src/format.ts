@@ -17,3 +17,15 @@ export function formatTaskCount(count: number): string {
 
   return `${count} заданий`;
 }
+
+export function formatCoursePrice(priceRubles: number): string {
+  if (priceRubles <= 0) {
+    return "Бесплатно";
+  }
+
+  return new Intl.NumberFormat("ru-RU", {
+    style: "currency",
+    currency: "RUB",
+    maximumFractionDigits: 0,
+  }).format(priceRubles);
+}

@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { Layout } from "../components/Layout";
-import { formatTaskCount } from "../format";
+import { formatCoursePrice, formatTaskCount } from "../format";
 import type { Certificate, CompletedTask, CourseListItem, ProgressSummary } from "../types";
 
 export function DashboardPage() {
@@ -34,12 +34,10 @@ export function DashboardPage() {
           <span className="eyebrow">Учебная платформа</span>
           <h1>Дополнительные курсы с интерактивными заданиями</h1>
           <p>Официальный формат обучения с небольшими игровыми элементами и понятной фиксацией прогресса.</p>
-          {(user?.role === "teacher" || user?.role === "admin") && (
-            <Link className="primary-button hero-action" to="/teacher">
-              <PencilRuler size={18} />
-              Управлять курсами
-            </Link>
-          )}
+          <Link className="primary-button hero-action" to="/my-courses">
+            <PencilRuler size={18} />
+            Создать курс
+          </Link>
         </div>
         <div className="summary-strip">
           <SummaryItem icon={<GraduationCap size={20} />} label="Курсы" value={summary?.courses_total ?? 0} />
@@ -72,6 +70,7 @@ export function DashboardPage() {
                 <div className="course-meta">
                   <span>{course.direction}</span>
                   <span>{course.level}</span>
+                  <span>{formatCoursePrice(course.price_rubles)}</span>
                 </div>
                 <h3>{course.title}</h3>
                 <p>{course.description}</p>
@@ -97,7 +96,7 @@ export function DashboardPage() {
             <div className="empty-state">
               <GraduationCap size={24} />
               <strong>Курсов пока нет</strong>
-              <span>Когда преподаватель добавит курс, он появится в этом разделе.</span>
+              <span>Когда пользователи добавят курсы, они появятся в этом разделе.</span>
             </div>
           )}
         </div>

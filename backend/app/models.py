@@ -12,7 +12,6 @@ from app.database import Base
 
 class UserRole(str, enum.Enum):
     student = "student"
-    teacher = "teacher"
     admin = "admin"
 
 
@@ -34,6 +33,7 @@ class User(Base):
 
     results: Mapped[list["TaskResult"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     certificates: Mapped[list["Certificate"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    courses: Mapped[list["Course"]] = relationship(back_populates="owner")
 
 
 class Course(Base):
@@ -45,8 +45,15 @@ class Course(Base):
     direction: Mapped[str] = mapped_column(String(120))
     level: Mapped[str] = mapped_column(String(80))
     duration_minutes: Mapped[int] = mapped_column(Integer, default=45)
+    price_rubles: Mapped[int] = mapped_column(Integer, default=0)
     image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
+    owner: Mapped[User | None] = relationship(back_populates="courses")
     lessons: Mapped[list["Lesson"]] = relationship(
         back_populates="course",
         cascade="all, delete-orphan",

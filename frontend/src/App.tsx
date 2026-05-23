@@ -35,13 +35,14 @@ export function App() {
         }
       />
       <Route
-        path="/teacher"
+        path="/my-courses"
         element={
           <ProtectedRoute>
             <TeacherPage />
           </ProtectedRoute>
         }
       />
+      <Route path="/teacher" element={<Navigate to="/my-courses" replace />} />
       <Route
         path="/admin"
         element={

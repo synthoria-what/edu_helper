@@ -83,6 +83,7 @@ class CourseListItem(BaseModel):
     direction: str
     level: str
     duration_minutes: int
+    price_rubles: int
     image_url: str | None = None
     total_tasks: int
     completed_tasks: int
@@ -142,6 +143,7 @@ class CourseMutation(BaseModel):
     direction: str = Field(min_length=2, max_length=120)
     level: str = Field(min_length=2, max_length=80)
     duration_minutes: int = Field(ge=5, le=600)
+    price_rubles: int = Field(default=0, ge=0, le=1_000_000)
     image_url: str | None = Field(default=None, max_length=500)
 
 

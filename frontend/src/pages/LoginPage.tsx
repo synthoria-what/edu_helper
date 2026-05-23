@@ -7,7 +7,7 @@ import { useAuth } from "../auth";
 export function LoginPage() {
   const { user, login, register } = useAuth();
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [fullName, setFullName] = useState("Студент Демонстрационный");
+  const [fullName, setFullName] = useState("Пользователь Демонстрационный");
   const [email, setEmail] = useState("student@example.com");
   const [password, setPassword] = useState("student123");
   const [error, setError] = useState("");
@@ -90,4 +90,3 @@ export function LoginPage() {
     </main>
   );
 }
-
