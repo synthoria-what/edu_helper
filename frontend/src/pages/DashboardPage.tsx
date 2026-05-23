@@ -59,11 +59,16 @@ export function DashboardPage() {
           {courses.length ? (
             courses.map((course) => (
               <article className="course-card" key={course.id}>
-                {course.image_url && (
-                  <div className="course-card-media" style={{ "--course-image": `url(${course.image_url})` } as React.CSSProperties}>
+                <div
+                  className={course.image_url ? "course-card-media" : "course-card-media course-card-media--empty"}
+                  style={course.image_url ? ({ "--course-image": `url(${course.image_url})` } as React.CSSProperties) : undefined}
+                >
+                  {course.image_url ? (
                     <img className="course-card-image" src={course.image_url} alt="" />
-                  </div>
-                )}
+                  ) : (
+                    <GraduationCap size={42} />
+                  )}
+                </div>
                 <div className="course-meta">
                   <span>{course.direction}</span>
                   <span>{course.level}</span>
