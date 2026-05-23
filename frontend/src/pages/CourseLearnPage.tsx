@@ -5,7 +5,7 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { InteractiveTask } from "../components/InteractiveTask";
 import { Layout } from "../components/Layout";
-import { formatCoursePrice, formatTaskCount } from "../format";
+import { formatTaskCount } from "../format";
 import { getEmbedVideoUrl } from "../video";
 import type { CourseDetail, Task } from "../types";
 
@@ -103,7 +103,6 @@ export function CourseLearnPage() {
             </div>
             <div className="progress-widget">
               <strong>{course.progress_percent}%</strong>
-              <span>{formatCoursePrice(course.price_rubles)}</span>
               <span>
                 {course.completed_tasks}/{formatTaskCount(course.total_tasks)}
               </span>

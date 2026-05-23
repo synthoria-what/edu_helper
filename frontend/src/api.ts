@@ -179,7 +179,7 @@ export const api = {
       body: JSON.stringify({ password }),
     });
   },
-  async courses(filters: { q?: string; price?: string; direction?: string; level?: string; owner_id?: string } = {}): Promise<CourseListItem[]> {
+  async courses(filters: { q?: string; direction?: string; level?: string; owner_id?: string } = {}): Promise<CourseListItem[]> {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
       if (value) params.set(key, value);

@@ -23,7 +23,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { api } from "../api";
 import { Layout } from "../components/Layout";
-import { formatCoursePrice, formatTaskCount } from "../format";
+import { formatTaskCount } from "../format";
 import { normalizeVideoUrl } from "../video";
 import type {
   CourseDetail,
@@ -64,7 +64,6 @@ const emptyCourse: CourseMutation = {
   direction: "Общие компетенции",
   level: "Базовый",
   duration_minutes: 45,
-  price_rubles: 0,
   image_url: "",
 };
 
@@ -140,7 +139,6 @@ export function TeacherPage() {
         direction: courseDetail.direction,
         level: courseDetail.level,
         duration_minutes: courseDetail.duration_minutes,
-        price_rubles: courseDetail.price_rubles,
         image_url: courseDetail.image_url ?? "",
       });
     } else {
@@ -164,7 +162,6 @@ export function TeacherPage() {
       direction: detail.direction,
       level: detail.level,
       duration_minutes: detail.duration_minutes,
-      price_rubles: detail.price_rubles,
       image_url: detail.image_url ?? "",
     });
     setLessonForm({ ...emptyLesson, order_index: detail.lessons.length + 1 });
@@ -411,7 +408,7 @@ export function TeacherPage() {
         <div>
           <span className="eyebrow">Авторский кабинет</span>
           <h1>Мои курсы, задания и прогресс участников</h1>
-          <p>Создавайте курсы в формате Stepik: уроки, материалы, задания и карточка с ценой.</p>
+          <p>Создавайте курсы в формате Stepik: уроки, материалы, задания и учебная карточка.</p>
         </div>
         <div className="summary-strip">
           <SummaryBox icon={<BookPlus size={20} />} label="Курсы" value={courses.length} />
@@ -452,7 +449,7 @@ export function TeacherPage() {
                   <strong>{course.title}</strong>
                   <span>{course.direction}</span>
                   <small>
-                    {formatTaskCount(course.total_tasks)} · {course.duration_minutes} мин. · {formatCoursePrice(course.price_rubles)}
+                    {formatTaskCount(course.total_tasks)} · {course.duration_minutes} мин.
                   </small>
                 </button>
               ))
@@ -489,20 +486,12 @@ export function TeacherPage() {
                 />
                 <CourseLevelSelect value={courseForm.level} onChange={(level) => setCourseForm({ ...courseForm, level })} />
               </div>
-              <div className="form-row">
-                <Field
-                  label="Минут"
-                  type="number"
-                  value={String(courseForm.duration_minutes)}
-                  onChange={(value) => setCourseForm({ ...courseForm, duration_minutes: Number(value) })}
-                />
-                <Field
-                  label="Цена, ₽"
-                  type="number"
-                  value={String(courseForm.price_rubles)}
-                  onChange={(value) => setCourseForm({ ...courseForm, price_rubles: Number(value) })}
-                />
-              </div>
+              <Field
+                label="Минут"
+                type="number"
+                value={String(courseForm.duration_minutes)}
+                onChange={(value) => setCourseForm({ ...courseForm, duration_minutes: Number(value) })}
+              />
               <div className="form-row">
                 <ImageUrlUploadField
                   label="Картинка курса"
@@ -567,7 +556,6 @@ export function TeacherPage() {
                 <div className="summary-strip compact">
                   <SummaryBox icon={<Video size={20} />} label="Уроки" value={courseDetail.lessons.length} />
                   <SummaryBox icon={<ListChecks size={20} />} label="Задания" value={courseDetail.total_tasks} />
-                  <SummaryBox icon={<BookPlus size={20} />} label="Цена" value={formatCoursePrice(courseDetail.price_rubles)} />
                   <SummaryBox icon={<UsersRound size={20} />} label="Участники" value={students.length} />
                 </div>
               </div>
@@ -1197,7 +1185,7 @@ function CourseLevelSelect({ value, onChange }: { value: string; onChange: (leve
   const options = Array.from(new Set([...COURSE_LEVELS, value].filter(Boolean)));
 
   return (
-    <label>
+    <label className="course-level-select">
       Уровень
       <select value={value} onChange={(event) => onChange(event.target.value)}>
         {options.map((level) => (
@@ -1225,7 +1213,6 @@ function RichTextEditor({
   const selectionRef = useRef<Range | null>(null);
   const lastHtmlRef = useRef(value);
   const [activeFormats, setActiveFormats] = useState({ bold: false, italic: false, underline: false });
-  const [fontSize, setFontSize] = useState("3");
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -1327,8 +1314,6 @@ function RichTextEditor({
 
     if (name === "bold" || name === "italic" || name === "underline") {
       setActiveFormats((current) => ({ ...current, [name]: !current[name] }));
-    } else if (name === "fontSize" && commandValue) {
-      setFontSize(commandValue);
     } else {
       window.setTimeout(updateToolbarState);
     }
@@ -1336,16 +1321,13 @@ function RichTextEditor({
 
   function updateToolbarState() {
     try {
-      const currentFontSize = document.queryCommandValue("fontSize") || "3";
       setActiveFormats({
         bold: document.queryCommandState("bold"),
         italic: document.queryCommandState("italic"),
         underline: document.queryCommandState("underline"),
       });
-      setFontSize(["2", "3", "5"].includes(currentFontSize) ? currentFontSize : "3");
     } catch {
       setActiveFormats({ bold: false, italic: false, underline: false });
-      setFontSize("3");
     }
   }
 
@@ -1374,17 +1356,8 @@ function RichTextEditor({
         <button type="button" className={activeFormats.underline ? "rich-tool-button rich-tool-button--icon active" : "rich-tool-button rich-tool-button--icon"} aria-label="Подчеркнуть" aria-pressed={activeFormats.underline} onMouseDown={(event) => event.preventDefault()} onClick={() => command("underline")} title="Подчеркнуть">
           <Underline size={16} />
         </button>
-        <label className="rich-size-select">
-          Размер
-          <select onMouseDown={() => saveSelection()} onChange={(event) => command("fontSize", event.target.value)} value={fontSize} title="Размер текста">
-            <option value="2">Мелкий</option>
-            <option value="3">Обычный</option>
-            <option value="5">Крупный</option>
-          </select>
-        </label>
-        <label className="rich-tool-button rich-image-picker" onMouseDown={() => saveSelection()} title="Вставить картинку">
+        <label className="rich-tool-button rich-tool-button--icon rich-image-picker" onMouseDown={() => saveSelection()} title="Вставить картинку">
           <Image size={18} />
-          Вставить
           <input
             aria-label="Вставить картинку"
             accept="image/gif,image/jpeg,image/png,image/webp"
@@ -1488,9 +1461,8 @@ function ImageUrlUploadField({
           <Image size={16} />
           <input placeholder="Ссылка на картинку" value={imageUrl} onChange={(event) => onChange(event.target.value)} />
         </span>
-        <label className="file-picker" title={isUploading ? "Загружаем..." : "Загрузить картинку"}>
+        <label className="file-picker compact" title={isUploading ? "Загружаем..." : "Загрузить картинку"}>
           <Upload size={18} />
-          {isUploading ? "Загрузка..." : "Загрузить"}
           <input
             aria-label="Загрузить картинку"
             accept="image/gif,image/jpeg,image/png,image/webp"
