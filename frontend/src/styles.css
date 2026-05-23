@@ -1458,7 +1458,7 @@ select {
 
 .field-heading {
   display: grid;
-  gap: 4px;
+  gap: 2px;
   color: #465451;
   font-size: 14px;
   font-weight: 800;
@@ -2103,7 +2103,7 @@ select {
 .admin-user-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
 
@@ -2130,15 +2130,15 @@ select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 42px;
+  gap: 7px;
+  min-height: 40px;
   border: 1px solid #d8ddd7;
   border-radius: 8px;
-  padding: 0 12px;
+  padding: 0 11px;
   background: #fffdfa;
   color: #24423f;
   cursor: pointer;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .rich-tool-button.active {
@@ -2146,6 +2146,11 @@ select {
   background: #edf7f5;
   color: #2f6f6a;
   box-shadow: inset 0 0 0 1px rgba(47, 111, 106, 0.08);
+}
+
+.rich-tool-button--icon {
+  width: 40px;
+  padding: 0;
 }
 
 .rich-size-select {
@@ -2158,7 +2163,7 @@ select {
 }
 
 .rich-size-select select {
-  width: 124px;
+  width: 112px;
 }
 
 .rich-image-picker input {
@@ -2398,26 +2403,6 @@ select {
   content: attr(data-placeholder);
   color: #8a9693;
   pointer-events: none;
-}
-
-.rich-editor-hints {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.rich-editor-hints span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 30px;
-  border: 1px solid #e4ded3;
-  border-radius: 8px;
-  padding: 0 10px;
-  background: #fffaf1;
-  color: #60706d;
-  font-size: 12px;
-  font-weight: 800;
 }
 
 .checkbox-list {

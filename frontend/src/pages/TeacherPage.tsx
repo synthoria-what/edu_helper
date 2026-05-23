@@ -1112,7 +1112,6 @@ function LearningGoalsEditor({ goals, onChange }: { goals: string[]; onChange: (
     <div className="learning-goals-editor">
       <div className="field-heading">
         <span>Чему научится ученик</span>
-        <p className="helper-text">Добавьте короткие результаты отдельными строками. Пустые строки не сохранятся.</p>
       </div>
       <div className="learning-goals-list">
         {visibleGoals.map((goal, index) => (
@@ -1199,19 +1198,26 @@ function RichTextEditor({
   function command(name: string, commandValue?: string) {
     editorRef.current?.focus();
     restoreSelection();
+    document.execCommand("styleWithCSS", false, "false");
     document.execCommand(name, false, commandValue);
     syncValue();
     saveSelection();
+    window.setTimeout(updateToolbarState);
   }
 
   function updateToolbarState() {
-    const currentFontSize = document.queryCommandValue("fontSize") || "3";
-    setActiveFormats({
-      bold: document.queryCommandState("bold"),
-      italic: document.queryCommandState("italic"),
-      underline: document.queryCommandState("underline"),
-    });
-    setFontSize(["2", "3", "5"].includes(currentFontSize) ? currentFontSize : "3");
+    try {
+      const currentFontSize = document.queryCommandValue("fontSize") || "3";
+      setActiveFormats({
+        bold: document.queryCommandState("bold"),
+        italic: document.queryCommandState("italic"),
+        underline: document.queryCommandState("underline"),
+      });
+      setFontSize(["2", "3", "5"].includes(currentFontSize) ? currentFontSize : "3");
+    } catch {
+      setActiveFormats({ bold: false, italic: false, underline: false });
+      setFontSize("3");
+    }
   }
 
   async function insertImage(file: File | undefined) {
@@ -1228,32 +1234,28 @@ function RichTextEditor({
     <div className="rich-editor-field">
       <div className="field-heading">
         <span>{label}</span>
-        <p className="helper-text">Это единственное поле для текста описания. Кнопки форматирования работают как переключатели: нажмите один раз, чтобы включить стиль, и еще раз, чтобы выключить.</p>
       </div>
       <div className="rich-editor-toolbar">
-        <button type="button" className={activeFormats.bold ? "rich-tool-button active" : "rich-tool-button"} aria-pressed={activeFormats.bold} onMouseDown={(event) => event.preventDefault()} onClick={() => command("bold")} title="Полужирный">
+        <button type="button" className={activeFormats.bold ? "rich-tool-button rich-tool-button--icon active" : "rich-tool-button rich-tool-button--icon"} aria-label="Полужирный" aria-pressed={activeFormats.bold} onMouseDown={(event) => event.preventDefault()} onClick={() => command("bold")} title="Полужирный">
           <Bold size={16} />
-          Жирный
         </button>
-        <button type="button" className={activeFormats.italic ? "rich-tool-button active" : "rich-tool-button"} aria-pressed={activeFormats.italic} onMouseDown={(event) => event.preventDefault()} onClick={() => command("italic")} title="Курсив">
+        <button type="button" className={activeFormats.italic ? "rich-tool-button rich-tool-button--icon active" : "rich-tool-button rich-tool-button--icon"} aria-label="Курсив" aria-pressed={activeFormats.italic} onMouseDown={(event) => event.preventDefault()} onClick={() => command("italic")} title="Курсив">
           <Italic size={16} />
-          Курсив
         </button>
-        <button type="button" className={activeFormats.underline ? "rich-tool-button active" : "rich-tool-button"} aria-pressed={activeFormats.underline} onMouseDown={(event) => event.preventDefault()} onClick={() => command("underline")} title="Подчеркнуть">
+        <button type="button" className={activeFormats.underline ? "rich-tool-button rich-tool-button--icon active" : "rich-tool-button rich-tool-button--icon"} aria-label="Подчеркнуть" aria-pressed={activeFormats.underline} onMouseDown={(event) => event.preventDefault()} onClick={() => command("underline")} title="Подчеркнуть">
           <Underline size={16} />
-          Подчеркнуть
         </button>
         <label className="rich-size-select">
-          Размер текста
+          Размер
           <select onMouseDown={saveSelection} onChange={(event) => command("fontSize", event.target.value)} value={fontSize} title="Размер текста">
-          <option value="2">Мелкий</option>
-          <option value="3">Обычный</option>
-          <option value="5">Крупный</option>
+            <option value="2">Мелкий</option>
+            <option value="3">Обычный</option>
+            <option value="5">Крупный</option>
           </select>
         </label>
         <label className="rich-tool-button rich-image-picker" onMouseDown={saveSelection} title="Вставить картинку">
           <Image size={18} />
-          Картинка в текст
+          Вставить
           <input
             aria-label="Вставить картинку"
             accept="image/gif,image/jpeg,image/png,image/webp"
@@ -1264,12 +1266,6 @@ function RichTextEditor({
             }}
           />
         </label>
-      </div>
-      <div className="rich-editor-hints">
-        <span><Bold size={14} /> Жирный</span>
-        <span><Italic size={14} /> Курсив</span>
-        <span><Underline size={14} /> Подчеркнутый</span>
-        <span><Image size={14} /> Картинка вставится прямо в описание</span>
       </div>
       <div
         className="rich-editor"
@@ -1358,7 +1354,6 @@ function ImageUrlUploadField({
     <div className="image-url-upload-field">
       <div className="field-heading">
         <span>{label}</span>
-        <p className="helper-text">Вставьте ссылку или загрузите файл. После выбора файла откроется окно кадрирования.</p>
       </div>
       <div className="image-url-upload-row">
         <span className="input-with-icon">
@@ -1430,7 +1425,6 @@ function PhotoEditorModal({
   return (
     <EditorModal title="Редактор картинки" onClose={onCancel}>
       <div className="photo-editor">
-        <p className="helper-text">Настройте кадр ползунками и сохраните. Ничего удерживать не нужно.</p>
         <div className="photo-editor-frame">
           <img
             src={imageUrl}
