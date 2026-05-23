@@ -205,7 +205,6 @@ async def build_course_list_item(session: AsyncSession, course: Course, user: Us
         direction=course.direction,
         level=course.level,
         duration_minutes=course.duration_minutes,
-        price_rubles=course.price_rubles,
         image_url=course.image_url,
         owner_name=owner_name or "Автор курса",
         lessons_count=lessons_count or 0,
@@ -262,7 +261,6 @@ async def assert_task_is_unlocked(session: AsyncSession, task_id: int, user: Use
 @router.get("", response_model=list[CourseListItem])
 async def list_courses(
     q: str | None = Query(default=None),
-    price: str | None = Query(default=None, pattern="^(free|paid)$"),
     direction: str | None = Query(default=None),
     level: str | None = Query(default=None),
     owner_id: str | None = Query(default=None),
@@ -280,10 +278,6 @@ async def list_courses(
                 User.full_name.ilike(pattern),
             )
         )
-    if price == "free":
-        query = query.where(Course.price_rubles == 0)
-    elif price == "paid":
-        query = query.where(Course.price_rubles > 0)
     if direction:
         query = query.where(Course.direction.ilike(f"%{direction.strip()}%"))
     if level:

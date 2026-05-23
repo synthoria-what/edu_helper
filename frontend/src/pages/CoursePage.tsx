@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { api } from "../api";
 import { Layout } from "../components/Layout";
-import { formatCoursePrice, formatTaskCount } from "../format";
+import { formatTaskCount } from "../format";
 import type { CourseDetail } from "../types";
 
 export function CoursePage() {
@@ -131,7 +131,6 @@ export function CoursePage() {
           <aside className="course-promo-sidebar">
             <div className="course-promo-aside">
               {course.image_url && <img src={course.image_url} alt="" />}
-              <strong>{formatCoursePrice(course.price_rubles)}</strong>
               <div className="promo-includes">
                 <div className="section-heading">
                   <h2>В курс входят</h2>

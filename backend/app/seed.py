@@ -32,7 +32,6 @@ async def seed_demo_data(session: AsyncSession) -> None:
         direction="Общие компетенции",
         level="Базовый",
         duration_minutes=55,
-        price_rubles=0,
         image_url="https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1200&q=80",
         owner_id=owner_id,
         lessons=[
