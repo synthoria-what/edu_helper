@@ -1089,6 +1089,11 @@ function PhotoEditorModal({
   onSave: (settings: PhotoEditSettings) => void;
 }) {
   const [settings, setSettings] = useState<PhotoEditSettings>({ offsetX: 0, offsetY: 0, zoom: 1 });
+  const [imageSize, setImageSize] = useState({ width: 16, height: 9 });
+  const frameRatio = 16 / 9;
+  const imageRatio = imageSize.width / imageSize.height;
+  const baseWidth = imageRatio > frameRatio ? imageRatio * 100 : 100;
+  const baseHeight = imageRatio > frameRatio ? 100 : (100 / imageRatio) * frameRatio;
 
   return (
     <EditorModal title="Редактор картинки" onClose={onCancel}>
@@ -1097,8 +1102,16 @@ function PhotoEditorModal({
           <img
             src={imageUrl}
             alt=""
+            onLoad={(event) =>
+              setImageSize({
+                width: event.currentTarget.naturalWidth || 16,
+                height: event.currentTarget.naturalHeight || 9,
+              })
+            }
             style={{
-              transform: `translate(-50%, -50%) translate(${settings.offsetX}%, ${settings.offsetY}%) scale(${settings.zoom})`,
+              width: `${baseWidth * settings.zoom}%`,
+              height: `${baseHeight * settings.zoom}%`,
+              transform: `translate(-50%, -50%) translate(${settings.offsetX}%, ${settings.offsetY}%)`,
             }}
           />
         </div>
@@ -1174,7 +1187,7 @@ async function createEditedImageFile(file: File, imageUrl: string, settings: Pho
 
   const imageRatio = image.naturalWidth / image.naturalHeight;
   const canvasRatio = canvas.width / canvas.height;
-  const baseScale = imageRatio > canvasRatio ? canvas.height / image.naturalHeight : canvas.width / image.naturalWidth;
+  const baseScale = imageRatio > canvasRatio ? canvas.width / image.naturalWidth : canvas.height / image.naturalHeight;
   const scale = baseScale * settings.zoom;
   const width = image.naturalWidth * scale;
   const height = image.naturalHeight * scale;
