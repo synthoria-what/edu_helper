@@ -1456,6 +1456,14 @@ select {
   line-height: 1.45;
 }
 
+.field-heading {
+  display: grid;
+  gap: 4px;
+  color: #465451;
+  font-size: 14px;
+  font-weight: 800;
+}
+
 .panel-title {
   display: flex;
   align-items: center;
@@ -2118,6 +2126,45 @@ select {
   background: #fff;
 }
 
+.rich-tool-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  border: 1px solid #d8ddd7;
+  border-radius: 8px;
+  padding: 0 12px;
+  background: #fffdfa;
+  color: #24423f;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.rich-tool-button.active {
+  border-color: rgba(47, 111, 106, 0.58);
+  background: #edf7f5;
+  color: #2f6f6a;
+  box-shadow: inset 0 0 0 1px rgba(47, 111, 106, 0.08);
+}
+
+.rich-size-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #60706d;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.rich-size-select select {
+  width: 124px;
+}
+
+.rich-image-picker input {
+  display: none;
+}
+
 .course-search-panel select:nth-of-type(1) {
   width: 132px;
 }
@@ -2299,6 +2346,32 @@ select {
   padding-right: 2px;
 }
 
+.learning-goals-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.learning-goals-list {
+  display: grid;
+  gap: 8px;
+}
+
+.learning-goal-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.learning-goal-row .icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.learning-goal-add {
+  width: fit-content;
+}
+
 .rich-content img,
 .rich-editor img {
   max-width: 100%;
@@ -2319,6 +2392,32 @@ select {
   border-radius: 8px;
   padding: 14px;
   background: #fff;
+}
+
+.rich-editor:empty::before {
+  content: attr(data-placeholder);
+  color: #8a9693;
+  pointer-events: none;
+}
+
+.rich-editor-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rich-editor-hints span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  border: 1px solid #e4ded3;
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #fffaf1;
+  color: #60706d;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .checkbox-list {

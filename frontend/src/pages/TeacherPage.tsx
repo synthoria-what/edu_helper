@@ -459,26 +459,15 @@ export function TeacherPage() {
               <PanelTitle icon={<Save size={20} />} title={selectedCourseId ? "Редактировать курс" : "Новый курс"} />
               <p className="helper-text">Заполните базовую карточку курса. Уроки и задания появятся отдельными шагами после сохранения.</p>
               <Field label="Название" value={courseForm.title} onChange={(value) => setCourseForm({ ...courseForm, title: value })} />
-              <Textarea
-                label="Краткое описание"
-                value={courseForm.description}
-                onChange={(value) => setCourseForm({ ...courseForm, description: value })}
-              />
               <RichTextEditor
-                label="Подробное описание"
+                label="Описание курса"
                 value={courseForm.description_html}
-                onChange={(value) => setCourseForm({ ...courseForm, description_html: value })}
+                onChange={(value) => setCourseForm({ ...courseForm, description_html: value, description: makeCourseExcerpt(value, courseForm.description) })}
                 onError={notify}
               />
-              <Textarea
-                label="Чему научится ученик"
-                value={courseForm.learning_goals.join("\n")}
-                onChange={(value) =>
-                  setCourseForm({
-                    ...courseForm,
-                    learning_goals: value.split("\n").map((item) => item.trim()).filter(Boolean),
-                  })
-                }
+              <LearningGoalsEditor
+                goals={courseForm.learning_goals}
+                onChange={(learningGoals) => setCourseForm({ ...courseForm, learning_goals: learningGoals })}
               />
               <div className="form-row">
                 <Field
@@ -932,12 +921,32 @@ function defaultTaskForm(orderIndex = 1, type: TaskType = "quiz"): TaskMutation 
 }
 
 function normalizeCourse(payload: CourseMutation): CourseMutation {
+  const description = makeCourseExcerpt(payload.description_html, payload.description);
   return {
     ...payload,
-    description_html: payload.description_html?.trim() || `<p>${escapeHtml(payload.description)}</p>`,
+    description,
+    description_html: payload.description_html?.trim() || `<p>${escapeHtml(description)}</p>`,
     learning_goals: payload.learning_goals.map((goal) => goal.trim()).filter(Boolean),
     image_url: payload.image_url?.trim() || null,
   };
+}
+
+function makeCourseExcerpt(html: string, fallback: string): string {
+  const plainText = htmlToPlainText(html).trim() || fallback.trim();
+  const normalized = plainText.replace(/\s+/g, " ");
+  if (normalized.length >= 10) {
+    return normalized.slice(0, 320);
+  }
+  return normalized || "Описание курса";
+}
+
+function htmlToPlainText(html: string): string {
+  if (typeof DOMParser !== "undefined") {
+    const document = new DOMParser().parseFromString(html || "", "text/html");
+    return document.body.textContent ?? "";
+  }
+
+  return html.replace(/<[^>]*>/g, " ");
 }
 
 function escapeHtml(value: string): string {
@@ -1085,6 +1094,55 @@ function Textarea({ label, value, onChange }: { label: string; value: string; on
   );
 }
 
+function LearningGoalsEditor({ goals, onChange }: { goals: string[]; onChange: (goals: string[]) => void }) {
+  const visibleGoals = goals.length ? goals : [""];
+
+  function updateGoal(index: number, value: string) {
+    const nextGoals = [...visibleGoals];
+    nextGoals[index] = value;
+    onChange(nextGoals);
+  }
+
+  function removeGoal(index: number) {
+    const nextGoals = visibleGoals.filter((_, goalIndex) => goalIndex !== index);
+    onChange(nextGoals.length ? nextGoals : [""]);
+  }
+
+  return (
+    <div className="learning-goals-editor">
+      <div className="field-heading">
+        <span>Чему научится ученик</span>
+        <p className="helper-text">Добавьте короткие результаты отдельными строками. Пустые строки не сохранятся.</p>
+      </div>
+      <div className="learning-goals-list">
+        {visibleGoals.map((goal, index) => (
+          <div className="learning-goal-row" key={`learning-goal-${index}`}>
+            <input
+              aria-label={`Результат обучения ${index + 1}`}
+              placeholder={`Результат ${index + 1}`}
+              value={goal}
+              onChange={(event) => updateGoal(index, event.target.value)}
+            />
+            <button
+              className="icon-button"
+              type="button"
+              onClick={() => removeGoal(index)}
+              disabled={visibleGoals.length === 1 && !goal.trim()}
+              title="Удалить результат"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <button className="secondary-button learning-goal-add" type="button" onClick={() => onChange([...visibleGoals, ""])}>
+        <Plus size={18} />
+        Добавить результат
+      </button>
+    </div>
+  );
+}
+
 function RichTextEditor({
   label,
   value,
@@ -1099,6 +1157,8 @@ function RichTextEditor({
   const editorRef = useRef<HTMLDivElement | null>(null);
   const selectionRef = useRef<Range | null>(null);
   const lastHtmlRef = useRef(value);
+  const [activeFormats, setActiveFormats] = useState({ bold: false, italic: false, underline: false });
+  const [fontSize, setFontSize] = useState("3");
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -1117,6 +1177,7 @@ function RichTextEditor({
     const range = selection.getRangeAt(0);
     if (editor.contains(range.commonAncestorContainer)) {
       selectionRef.current = range.cloneRange();
+      updateToolbarState();
     }
   }
 
@@ -1132,6 +1193,7 @@ function RichTextEditor({
     const nextValue = editorRef.current?.innerHTML ?? "";
     lastHtmlRef.current = nextValue;
     onChange(nextValue);
+    updateToolbarState();
   }
 
   function command(name: string, commandValue?: string) {
@@ -1140,6 +1202,16 @@ function RichTextEditor({
     document.execCommand(name, false, commandValue);
     syncValue();
     saveSelection();
+  }
+
+  function updateToolbarState() {
+    const currentFontSize = document.queryCommandValue("fontSize") || "3";
+    setActiveFormats({
+      bold: document.queryCommandState("bold"),
+      italic: document.queryCommandState("italic"),
+      underline: document.queryCommandState("underline"),
+    });
+    setFontSize(["2", "3", "5"].includes(currentFontSize) ? currentFontSize : "3");
   }
 
   async function insertImage(file: File | undefined) {
@@ -1154,18 +1226,34 @@ function RichTextEditor({
 
   return (
     <div className="rich-editor-field">
-      <span>{label}</span>
+      <div className="field-heading">
+        <span>{label}</span>
+        <p className="helper-text">Это единственное поле для текста описания. Кнопки форматирования работают как переключатели: нажмите один раз, чтобы включить стиль, и еще раз, чтобы выключить.</p>
+      </div>
       <div className="rich-editor-toolbar">
-        <button type="button" className="icon-button" onMouseDown={(event) => event.preventDefault()} onClick={() => command("bold")} title="Полужирный"><Bold size={16} /></button>
-        <button type="button" className="icon-button" onMouseDown={(event) => event.preventDefault()} onClick={() => command("italic")} title="Курсив"><Italic size={16} /></button>
-        <button type="button" className="icon-button" onMouseDown={(event) => event.preventDefault()} onClick={() => command("underline")} title="Подчеркнутый"><Underline size={16} /></button>
-        <select onMouseDown={saveSelection} onChange={(event) => command("fontSize", event.target.value)} defaultValue="3" title="Размер">
+        <button type="button" className={activeFormats.bold ? "rich-tool-button active" : "rich-tool-button"} aria-pressed={activeFormats.bold} onMouseDown={(event) => event.preventDefault()} onClick={() => command("bold")} title="Полужирный">
+          <Bold size={16} />
+          Жирный
+        </button>
+        <button type="button" className={activeFormats.italic ? "rich-tool-button active" : "rich-tool-button"} aria-pressed={activeFormats.italic} onMouseDown={(event) => event.preventDefault()} onClick={() => command("italic")} title="Курсив">
+          <Italic size={16} />
+          Курсив
+        </button>
+        <button type="button" className={activeFormats.underline ? "rich-tool-button active" : "rich-tool-button"} aria-pressed={activeFormats.underline} onMouseDown={(event) => event.preventDefault()} onClick={() => command("underline")} title="Подчеркнуть">
+          <Underline size={16} />
+          Подчеркнуть
+        </button>
+        <label className="rich-size-select">
+          Размер текста
+          <select onMouseDown={saveSelection} onChange={(event) => command("fontSize", event.target.value)} value={fontSize} title="Размер текста">
           <option value="2">Мелкий</option>
           <option value="3">Обычный</option>
           <option value="5">Крупный</option>
-        </select>
-        <label className="file-picker compact" onMouseDown={saveSelection} title="Вставить картинку">
+          </select>
+        </label>
+        <label className="rich-tool-button rich-image-picker" onMouseDown={saveSelection} title="Вставить картинку">
           <Image size={18} />
+          Картинка в текст
           <input
             aria-label="Вставить картинку"
             accept="image/gif,image/jpeg,image/png,image/webp"
@@ -1177,9 +1265,17 @@ function RichTextEditor({
           />
         </label>
       </div>
+      <div className="rich-editor-hints">
+        <span><Bold size={14} /> Жирный</span>
+        <span><Italic size={14} /> Курсив</span>
+        <span><Underline size={14} /> Подчеркнутый</span>
+        <span><Image size={14} /> Картинка вставится прямо в описание</span>
+      </div>
       <div
         className="rich-editor"
+        aria-label={label}
         contentEditable
+        data-placeholder="Напишите описание курса здесь"
         dangerouslySetInnerHTML={{ __html: lastHtmlRef.current }}
         onBlur={() => {
           saveSelection();
@@ -1188,6 +1284,7 @@ function RichTextEditor({
         onInput={syncValue}
         onKeyUp={saveSelection}
         onMouseUp={saveSelection}
+        onFocus={updateToolbarState}
         ref={editorRef}
         suppressContentEditableWarning
       />
@@ -1259,14 +1356,18 @@ function ImageUrlUploadField({
 
   return (
     <div className="image-url-upload-field">
-      <span>{label}</span>
+      <div className="field-heading">
+        <span>{label}</span>
+        <p className="helper-text">Вставьте ссылку или загрузите файл. После выбора файла откроется окно кадрирования.</p>
+      </div>
       <div className="image-url-upload-row">
         <span className="input-with-icon">
           <Image size={16} />
-          <input value={imageUrl} onChange={(event) => onChange(event.target.value)} />
+          <input placeholder="Ссылка на картинку" value={imageUrl} onChange={(event) => onChange(event.target.value)} />
         </span>
-        <label className="file-picker compact" title={isUploading ? "Загружаем..." : "Загрузить картинку"}>
+        <label className="file-picker" title={isUploading ? "Загружаем..." : "Загрузить картинку"}>
           <Upload size={18} />
+          {isUploading ? "Загрузка..." : "Загрузить"}
           <input
             aria-label="Загрузить картинку"
             accept="image/gif,image/jpeg,image/png,image/webp"
@@ -1283,7 +1384,7 @@ function ImageUrlUploadField({
         <div className="upload-preview">
           <img src={imageUrl} alt="" />
           <button className="secondary-button" type="button" onClick={() => void editCurrentImage()}>
-            Править
+            Кадрировать
           </button>
           <button className="secondary-button" type="button" onClick={() => onChange("")}>
             Убрать
@@ -1329,6 +1430,7 @@ function PhotoEditorModal({
   return (
     <EditorModal title="Редактор картинки" onClose={onCancel}>
       <div className="photo-editor">
+        <p className="helper-text">Настройте кадр ползунками и сохраните. Ничего удерживать не нужно.</p>
         <div className="photo-editor-frame">
           <img
             src={imageUrl}
