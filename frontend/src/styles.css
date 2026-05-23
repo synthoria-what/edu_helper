@@ -600,14 +600,14 @@ select {
   gap: 18px;
 }
 
-.student-module-overview {
-  display: grid;
-  gap: 18px;
-}
-
-.student-module-overview.has-media {
+.student-module-detail.has-media {
   grid-template-columns: minmax(0, 1fr) minmax(280px, 0.46fr);
   align-items: start;
+}
+
+.student-module-main-flow {
+  display: grid;
+  gap: 18px;
 }
 
 .student-module-copy,
@@ -1752,7 +1752,7 @@ select {
   .auth-page,
   .lesson-block,
   .progress-history-section,
-  .student-module-overview.has-media,
+  .student-module-detail.has-media,
   .student-module-shell,
   .teacher-workspace,
   .teacher-grid {

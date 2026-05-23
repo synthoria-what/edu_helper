@@ -144,73 +144,73 @@ export function CoursePage() {
             </aside>
 
             {selectedLesson ? (
-              <section className="student-module-detail">
-                <div className={selectedLesson.image_url || selectedLesson.video_url ? "student-module-overview has-media" : "student-module-overview"}>
+              <section className={selectedLesson.image_url || selectedLesson.video_url ? "student-module-detail has-media" : "student-module-detail"}>
+                <div className="student-module-main-flow">
                   <div className="student-module-copy">
                     <span>Модуль {selectedLesson.order_index}</span>
                     <h2>{selectedLesson.title}</h2>
                     <p>{selectedLesson.content}</p>
                   </div>
 
-                  {(selectedLesson.image_url || selectedLesson.video_url) && (
-                    <aside className="student-module-media">
-                      <div className="student-module-task-heading">
-                        <Video size={20} />
-                        <h3>Материалы модуля</h3>
-                      </div>
-                      {selectedLesson.image_url && <img className="lesson-image" src={selectedLesson.image_url} alt="" />}
-                      {selectedLesson.video_url && (
-                        <div>
-                          <div className="video-frame">
-                            <iframe
-                              src={getEmbedVideoUrl(selectedLesson.video_url)}
-                              title={selectedLesson.title}
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                              allowFullScreen
-                              referrerPolicy="strict-origin-when-cross-origin"
-                            />
+                  <div className="student-module-tasks">
+                    <div className="student-module-task-heading">
+                      <ListChecks size={20} />
+                      <h3>Задания модуля</h3>
+                    </div>
+                    <div className="task-stack">
+                      {selectedLesson.tasks.length ? (
+                        selectedLesson.tasks.map((task) => {
+                          if (task.result?.is_correct && !retryTaskIds.has(task.id)) {
+                            return <TaskStateCard key={task.id} task={task} state="done" onRetry={() => retryTask(task.id)} />;
+                          }
+                          if (task.id === activeTaskId) {
+                            return <InteractiveTask key={task.id} task={task} onSolved={(isCorrect) => handleTaskAnswered(task.id, isCorrect)} />;
+                          }
+                          if (retryTaskIds.has(task.id)) {
+                            return <InteractiveTask key={task.id} task={task} onSolved={(isCorrect) => handleTaskAnswered(task.id, isCorrect)} />;
+                          }
+                          return <TaskStateCard key={task.id} task={task} state="locked" />;
+                        })
+                      ) : (
+                        <div className="task-panel task-panel--locked">
+                          <div className="task-header">
+                            <span className="task-icon"><Video size={18} /></span>
+                            <div>
+                              <h3>Заданий пока нет</h3>
+                              <p>Изучите материал модуля и переходите к следующему разделу курса.</p>
+                            </div>
                           </div>
-                          <a className="video-open-link" href={selectedLesson.video_url} target="_blank" rel="noreferrer">
-                            Открыть видео в новом окне
-                          </a>
                         </div>
                       )}
-                    </aside>
-                  )}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="student-module-tasks">
-                  <div className="student-module-task-heading">
-                    <ListChecks size={20} />
-                    <h3>Задания модуля</h3>
-                  </div>
-                  <div className="task-stack">
-                    {selectedLesson.tasks.length ? (
-                      selectedLesson.tasks.map((task) => {
-                        if (task.result?.is_correct && !retryTaskIds.has(task.id)) {
-                          return <TaskStateCard key={task.id} task={task} state="done" onRetry={() => retryTask(task.id)} />;
-                        }
-                        if (task.id === activeTaskId) {
-                          return <InteractiveTask key={task.id} task={task} onSolved={(isCorrect) => handleTaskAnswered(task.id, isCorrect)} />;
-                        }
-                        if (retryTaskIds.has(task.id)) {
-                          return <InteractiveTask key={task.id} task={task} onSolved={(isCorrect) => handleTaskAnswered(task.id, isCorrect)} />;
-                        }
-                        return <TaskStateCard key={task.id} task={task} state="locked" />;
-                      })
-                    ) : (
-                      <div className="task-panel task-panel--locked">
-                        <div className="task-header">
-                          <span className="task-icon"><Video size={18} /></span>
-                          <div>
-                            <h3>Заданий пока нет</h3>
-                            <p>Изучите материал модуля и переходите к следующему разделу курса.</p>
-                          </div>
+                {(selectedLesson.image_url || selectedLesson.video_url) && (
+                  <aside className="student-module-media">
+                    <div className="student-module-task-heading">
+                      <Video size={20} />
+                      <h3>Материалы модуля</h3>
+                    </div>
+                    {selectedLesson.image_url && <img className="lesson-image" src={selectedLesson.image_url} alt="" />}
+                    {selectedLesson.video_url && (
+                      <div>
+                        <div className="video-frame">
+                          <iframe
+                            src={getEmbedVideoUrl(selectedLesson.video_url)}
+                            title={selectedLesson.title}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            allowFullScreen
+                            referrerPolicy="strict-origin-when-cross-origin"
+                          />
                         </div>
+                        <a className="video-open-link" href={selectedLesson.video_url} target="_blank" rel="noreferrer">
+                          Открыть видео в новом окне
+                        </a>
                       </div>
                     )}
-                  </div>
-                </div>
+                  </aside>
+                )}
               </section>
             ) : (
               <section className="student-module-detail">
