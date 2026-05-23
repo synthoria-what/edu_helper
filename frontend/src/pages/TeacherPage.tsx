@@ -1,4 +1,6 @@
 import {
+  ArrowDown,
+  ArrowUp,
   BarChart3,
   Bold,
   BookPlus,
@@ -791,7 +793,7 @@ export function TeacherPage() {
               />
               <TaskTypeButton
                 active={taskForm.type === "rebus"}
-                description="Ребус и текстовый ответ"
+                description="Картинка и текстовый ответ"
                 label="Ребус"
                 onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "rebus"))}
               />
@@ -821,19 +823,21 @@ export function TeacherPage() {
             </div>
             <Field label="Название" value={taskForm.title} onChange={(value) => setTaskForm({ ...taskForm, title: value })} />
             <Textarea label="Вопрос для ученика" value={taskForm.prompt} onChange={(value) => setTaskForm({ ...taskForm, prompt: value })} />
-            <TaskPayloadFields taskForm={taskForm} setTaskForm={setTaskForm} />
+            <TaskPayloadFields taskForm={taskForm} setTaskForm={setTaskForm} onError={notify} />
 
             <div className="builder-step">
               <span>3</span>
               <strong>Дополнительно</strong>
             </div>
             <div className="form-row">
-              <ImageUrlUploadField
-                label="Картинка задания"
-                imageUrl={taskForm.image_url ?? ""}
-                onChange={(value) => setTaskForm({ ...taskForm, image_url: value })}
-                onError={notify}
-              />
+              {taskForm.type !== "rebus" && (
+                <ImageUrlUploadField
+                  label="Картинка задания"
+                  imageUrl={taskForm.image_url ?? ""}
+                  onChange={(value) => setTaskForm({ ...taskForm, image_url: value })}
+                  onError={notify}
+                />
+              )}
               <Field
                 label="Порядок"
                 type="number"
@@ -876,9 +880,9 @@ function defaultTaskForm(orderIndex = 1, type: TaskType = "quiz"): TaskMutation 
     return {
       type,
       title: "Ребус",
-      prompt: "Разгадай термин.",
-      payload: { clue: "ИН + ФО", hint: "Подсказка для ученика" },
-      correct_answer: "Инфо",
+      prompt: "Разгадай слово по картинке.",
+      payload: { hint: "" },
+      correct_answer: "Ответ",
       image_url: "",
       order_index: orderIndex,
     };
@@ -983,6 +987,13 @@ function getCorrectAnswers(taskForm: TaskMutation): string[] {
 
 function getOrderItems(taskForm: TaskMutation): string[] {
   return Array.isArray(taskForm.payload.items) ? taskForm.payload.items.map(String) : [];
+}
+
+function moveArrayItem<T>(items: T[], fromIndex: number, toIndex: number): T[] {
+  const nextItems = [...items];
+  const [item] = nextItems.splice(fromIndex, 1);
+  nextItems.splice(toIndex, 0, item);
+  return nextItems;
 }
 
 function SummaryBox({ icon, label, value }: { icon: React.ReactNode; label: string; value: number | string }) {
@@ -1384,9 +1395,11 @@ async function createEditedImageFile(file: File, imageUrl: string, settings: Pho
 function TaskPayloadFields({
   taskForm,
   setTaskForm,
+  onError,
 }: {
   taskForm: TaskMutation;
   setTaskForm: (value: TaskMutation) => void;
+  onError: (message: string) => void;
 }) {
   if (taskForm.type === "chart") {
     const points = getPoints(taskForm);
@@ -1473,24 +1486,25 @@ function TaskPayloadFields({
   if (taskForm.type === "rebus") {
     return (
       <div className="specific-fields">
-        <p className="helper-text">Ребус показывается крупно. Ответ ученик вводит вручную.</p>
+        <p className="helper-text">Загрузите картинку ребуса. Ученик увидит ее крупно и введет ответ вручную.</p>
+        <ImageUrlUploadField
+          label="Картинка ребуса"
+          imageUrl={taskForm.image_url ?? ""}
+          onChange={(value) => setTaskForm({ ...taskForm, image_url: value })}
+          onError={onError}
+        />
         <div className="form-row">
-          <Field
-            label="Текст ребуса"
-            value={String(taskForm.payload.clue ?? "")}
-            onChange={(value) => setTaskForm({ ...taskForm, payload: { ...taskForm.payload, clue: value } })}
-          />
           <Field
             label="Подсказка"
             value={String(taskForm.payload.hint ?? "")}
             onChange={(value) => setTaskForm({ ...taskForm, payload: { ...taskForm.payload, hint: value } })}
           />
+          <Field
+            label="Правильный ответ"
+            value={taskForm.correct_answer}
+            onChange={(value) => setTaskForm({ ...taskForm, correct_answer: value })}
+          />
         </div>
-        <Field
-          label="Правильный ответ"
-          value={taskForm.correct_answer}
-          onChange={(value) => setTaskForm({ ...taskForm, correct_answer: value })}
-        />
       </div>
     );
   }
@@ -1514,7 +1528,7 @@ function TaskPayloadFields({
       <div className="specific-fields">
         <p className="helper-text">Порядок строк ниже считается правильным ответом.</p>
         {items.map((item, index) => (
-          <div className="option-editor-row" key={`order-item-${index}`}>
+          <div className="option-editor-row order-editor-row" key={`order-item-${index}`}>
             <input
               value={item}
               onChange={(event) => {
@@ -1524,6 +1538,32 @@ function TaskPayloadFields({
               placeholder={`Шаг ${index + 1}`}
               required
             />
+            <div className="option-editor-actions">
+              <button
+                className="icon-button"
+                type="button"
+                disabled={index === 0}
+                onClick={() => {
+                  const nextItems = moveArrayItem(items, index, index - 1);
+                  setTaskForm({ ...taskForm, payload: { items: nextItems }, correct_answer: nextItems.join("|") });
+                }}
+                title="Выше"
+              >
+                <ArrowUp size={16} />
+              </button>
+              <button
+                className="icon-button"
+                type="button"
+                disabled={index === items.length - 1}
+                onClick={() => {
+                  const nextItems = moveArrayItem(items, index, index + 1);
+                  setTaskForm({ ...taskForm, payload: { items: nextItems }, correct_answer: nextItems.join("|") });
+                }}
+                title="Ниже"
+              >
+                <ArrowDown size={16} />
+              </button>
+            </div>
             <button
               className="icon-button"
               type="button"
@@ -1675,8 +1715,12 @@ function TaskPreview({ taskForm }: { taskForm: TaskMutation }) {
       )}
       {taskForm.type === "rebus" && (
         <div className="preview-rebus">
-          <strong>{String(taskForm.payload.clue ?? "")}</strong>
-          <small>{String(taskForm.payload.hint ?? "")}</small>
+          {taskForm.image_url ? (
+            <img className="preview-rebus-image" src={taskForm.image_url} alt="" />
+          ) : (
+            <strong>{String(taskForm.payload.clue ?? "") || "Загрузите картинку ребуса"}</strong>
+          )}
+          {String(taskForm.payload.hint ?? "") && <small>{String(taskForm.payload.hint)}</small>}
         </div>
       )}
       {taskForm.type === "text_input" && <div className="preview-rebus"><small>Поле короткого ответа</small></div>}

@@ -67,7 +67,7 @@ export function InteractiveTask({ task, onSolved }: InteractiveTaskProps) {
         </div>
       </div>
 
-      {task.image_url && <img className="task-image" src={task.image_url} alt="" />}
+      {task.image_url && task.type !== "rebus" && <img className="task-image" src={task.image_url} alt="" />}
 
       {task.type === "quiz" && (
         <div className="option-grid">
@@ -117,8 +117,12 @@ export function InteractiveTask({ task, onSolved }: InteractiveTaskProps) {
       {task.type === "rebus" && (
         <>
           <div className="rebus-box">
-            <strong>{String(task.payload.clue ?? "")}</strong>
-            <span>{String(task.payload.hint ?? "")}</span>
+            {task.image_url ? (
+              <img className="rebus-image" src={task.image_url} alt="" />
+            ) : (
+              <strong>{String(task.payload.clue ?? "")}</strong>
+            )}
+            {String(task.payload.hint ?? "") && <span>{String(task.payload.hint)}</span>}
           </div>
           <AnswerForm
             answer={answer}
