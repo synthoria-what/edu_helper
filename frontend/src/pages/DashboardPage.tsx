@@ -9,6 +9,10 @@ import type { CourseListItem, ProgressSummary } from "../types";
 
 const COURSES_PER_PAGE = 9;
 
+function splitCourseDirections(value: string): string[] {
+  return value.split(",").map((direction) => direction.trim()).filter(Boolean);
+}
+
 export function DashboardPage() {
   const [searchParams] = useSearchParams();
   const ownerId = searchParams.get("owner_id") ?? "";
@@ -43,7 +47,10 @@ export function DashboardPage() {
     void loadDashboard({ q: "", price: "", direction: "", level: "", owner_id: ownerId });
   }, [searchParams]);
 
-  const directions = useMemo(() => Array.from(new Set(courses.map((course) => course.direction))).sort(), [courses]);
+  const directions = useMemo(
+    () => Array.from(new Set(courses.flatMap((course) => splitCourseDirections(course.direction)))).sort(),
+    [courses],
+  );
   const levels = useMemo(() => Array.from(new Set(courses.map((course) => course.level))).sort(), [courses]);
   const totalPages = Math.max(1, Math.ceil(courses.length / COURSES_PER_PAGE));
   const pageCourses = useMemo(

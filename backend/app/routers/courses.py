@@ -285,7 +285,7 @@ async def list_courses(
     elif price == "paid":
         query = query.where(Course.price_rubles > 0)
     if direction:
-        query = query.where(Course.direction == direction)
+        query = query.where(Course.direction.ilike(f"%{direction.strip()}%"))
     if level:
         query = query.where(Course.level == level)
     if owner_id:

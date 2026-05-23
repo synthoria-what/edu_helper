@@ -43,6 +43,19 @@ type ChartPoint = {
 
 type ManagerPanel = "lessons" | "tasks" | "progress";
 
+const COURSE_DIRECTIONS = [
+  "Общие компетенции",
+  "Программирование",
+  "Аналитика",
+  "Дизайн",
+  "Маркетинг",
+  "Бизнес",
+  "Иностранные языки",
+  "Soft skills",
+];
+
+const COURSE_LEVELS = ["Базовый", "Средний", "Продвинутый"];
+
 const emptyCourse: CourseMutation = {
   title: "",
   description: "",
@@ -470,12 +483,11 @@ export function TeacherPage() {
                 onChange={(learningGoals) => setCourseForm({ ...courseForm, learning_goals: learningGoals })}
               />
               <div className="form-row">
-                <Field
-                  label="Направление"
-                  value={courseForm.direction}
-                  onChange={(value) => setCourseForm({ ...courseForm, direction: value })}
+                <CourseDirectionsPicker
+                  value={splitCourseDirections(courseForm.direction)}
+                  onChange={(directions) => setCourseForm({ ...courseForm, direction: formatCourseDirections(directions) })}
                 />
-                <Field label="Уровень" value={courseForm.level} onChange={(value) => setCourseForm({ ...courseForm, level: value })} />
+                <CourseLevelSelect value={courseForm.level} onChange={(level) => setCourseForm({ ...courseForm, level })} />
               </div>
               <div className="form-row">
                 <Field
@@ -922,13 +934,24 @@ function defaultTaskForm(orderIndex = 1, type: TaskType = "quiz"): TaskMutation 
 
 function normalizeCourse(payload: CourseMutation): CourseMutation {
   const description = makeCourseExcerpt(payload.description_html, payload.description);
+  const direction = formatCourseDirections(splitCourseDirections(payload.direction)) || COURSE_DIRECTIONS[0];
   return {
     ...payload,
     description,
     description_html: payload.description_html?.trim() || `<p>${escapeHtml(description)}</p>`,
     learning_goals: payload.learning_goals.map((goal) => goal.trim()).filter(Boolean),
+    direction,
+    level: payload.level.trim() || COURSE_LEVELS[0],
     image_url: payload.image_url?.trim() || null,
   };
+}
+
+function splitCourseDirections(value: string): string[] {
+  return value.split(",").map((direction) => direction.trim()).filter(Boolean);
+}
+
+function formatCourseDirections(directions: string[]): string {
+  return Array.from(new Set(directions.map((direction) => direction.trim()).filter(Boolean))).join(", ");
 }
 
 function makeCourseExcerpt(html: string, fallback: string): string {
@@ -1142,6 +1165,51 @@ function LearningGoalsEditor({ goals, onChange }: { goals: string[]; onChange: (
   );
 }
 
+function CourseDirectionsPicker({ value, onChange }: { value: string[]; onChange: (directions: string[]) => void }) {
+  const options = Array.from(new Set([...COURSE_DIRECTIONS, ...value]));
+
+  function toggleDirection(direction: string) {
+    if (value.includes(direction)) {
+      onChange(value.filter((item) => item !== direction));
+      return;
+    }
+    onChange([...value, direction]);
+  }
+
+  return (
+    <div className="course-directions-picker">
+      <div className="field-heading">
+        <span>Направления</span>
+      </div>
+      <div className="checkbox-list course-directions-list">
+        {options.map((direction) => (
+          <label key={direction}>
+            <input checked={value.includes(direction)} type="checkbox" onChange={() => toggleDirection(direction)} />
+            <span>{direction}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CourseLevelSelect({ value, onChange }: { value: string; onChange: (level: string) => void }) {
+  const options = Array.from(new Set([...COURSE_LEVELS, value].filter(Boolean)));
+
+  return (
+    <label>
+      Уровень
+      <select value={value} onChange={(event) => onChange(event.target.value)}>
+        {options.map((level) => (
+          <option key={level} value={level}>
+            {level}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function RichTextEditor({
   label,
   value,
@@ -1179,7 +1247,7 @@ function RichTextEditor({
     lastHtmlRef.current = value || "";
   }, [value]);
 
-  function saveSelection() {
+  function saveSelection(updateState = true) {
     const editor = editorRef.current;
     const selection = window.getSelection();
     if (!editor || !selection?.rangeCount) return;
@@ -1187,7 +1255,9 @@ function RichTextEditor({
     const range = selection.getRangeAt(0);
     if (editor.contains(range.commonAncestorContainer)) {
       selectionRef.current = range.cloneRange();
-      updateToolbarState();
+      if (updateState) {
+        updateToolbarState();
+      }
     }
   }
 
@@ -1239,20 +1309,29 @@ function RichTextEditor({
     }
   }
 
-  function syncValue() {
+  function syncValue(updateState = true) {
     const nextValue = editorRef.current?.innerHTML ?? "";
     lastHtmlRef.current = nextValue;
     onChange(nextValue);
-    updateToolbarState();
+    if (updateState) {
+      updateToolbarState();
+    }
   }
 
   function command(name: string, commandValue?: string) {
     ensureEditorSelection();
     document.execCommand("styleWithCSS", false, "false");
     document.execCommand(name, false, commandValue);
-    syncValue();
-    saveSelection();
-    window.setTimeout(updateToolbarState);
+    syncValue(false);
+    saveSelection(false);
+
+    if (name === "bold" || name === "italic" || name === "underline") {
+      setActiveFormats((current) => ({ ...current, [name]: !current[name] }));
+    } else if (name === "fontSize" && commandValue) {
+      setFontSize(commandValue);
+    } else {
+      window.setTimeout(updateToolbarState);
+    }
   }
 
   function updateToolbarState() {
@@ -1297,13 +1376,13 @@ function RichTextEditor({
         </button>
         <label className="rich-size-select">
           Размер
-          <select onMouseDown={saveSelection} onChange={(event) => command("fontSize", event.target.value)} value={fontSize} title="Размер текста">
+          <select onMouseDown={() => saveSelection()} onChange={(event) => command("fontSize", event.target.value)} value={fontSize} title="Размер текста">
             <option value="2">Мелкий</option>
             <option value="3">Обычный</option>
             <option value="5">Крупный</option>
           </select>
         </label>
-        <label className="rich-tool-button rich-image-picker" onMouseDown={saveSelection} title="Вставить картинку">
+        <label className="rich-tool-button rich-image-picker" onMouseDown={() => saveSelection()} title="Вставить картинку">
           <Image size={18} />
           Вставить
           <input
@@ -1326,9 +1405,9 @@ function RichTextEditor({
           saveSelection();
           syncValue();
         }}
-        onInput={syncValue}
-        onKeyUp={saveSelection}
-        onMouseUp={saveSelection}
+        onInput={() => syncValue()}
+        onKeyUp={() => saveSelection()}
+        onMouseUp={() => saveSelection()}
         onFocus={updateToolbarState}
         ref={editorRef}
         suppressContentEditableWarning
