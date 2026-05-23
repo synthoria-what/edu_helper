@@ -397,7 +397,6 @@ select {
 }
 
 .course-card-image,
-.course-cover,
 .lesson-image,
 .task-image {
   display: block;
@@ -411,15 +410,9 @@ select {
   aspect-ratio: 16 / 9;
 }
 
-.course-cover {
-  max-width: 280px;
-  aspect-ratio: 4 / 3;
-}
-
 .lesson-image,
 .task-image {
   aspect-ratio: 16 / 9;
-  margin: 14px 0;
 }
 
 .course-meta,
@@ -570,7 +563,18 @@ select {
   gap: 18px;
 }
 
+.student-module-overview {
+  display: grid;
+  gap: 18px;
+}
+
+.student-module-overview.has-media {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.46fr);
+  align-items: start;
+}
+
 .student-module-copy,
+.student-module-media,
 .student-module-tasks {
   padding: 22px;
   border: 1px solid rgba(47, 111, 106, 0.16);
@@ -599,6 +603,11 @@ select {
 .student-module-tasks {
   display: grid;
   gap: 16px;
+}
+
+.student-module-media {
+  display: grid;
+  gap: 14px;
 }
 
 .lesson-block {
@@ -1505,14 +1514,14 @@ select {
 
 .upload-preview {
   display: grid;
-  grid-template-columns: minmax(0, 220px) auto;
+  grid-template-columns: minmax(0, 128px) auto;
   gap: 12px;
   align-items: center;
 }
 
 .upload-preview img {
   width: 100%;
-  aspect-ratio: 16 / 9;
+  height: 76px;
   border: 1px solid #d8ddd7;
   border-radius: 8px;
   object-fit: cover;
@@ -1644,6 +1653,7 @@ select {
   .auth-page,
   .lesson-block,
   .progress-history-section,
+  .student-module-overview.has-media,
   .student-module-shell,
   .teacher-workspace,
   .teacher-grid {

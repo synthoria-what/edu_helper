@@ -97,7 +97,6 @@ export function CoursePage() {
               <h1>{course.title}</h1>
               <p>{course.description}</p>
             </div>
-            {course.image_url && <img className="course-cover" src={course.image_url} alt="" />}
             <div className="progress-widget">
               <strong>{course.progress_percent}%</strong>
               <span>
@@ -138,26 +137,37 @@ export function CoursePage() {
 
             {selectedLesson && (
               <section className="student-module-detail">
-                <div className="student-module-copy">
-                  <span>Модуль {selectedLesson.order_index}</span>
-                  <h2>{selectedLesson.title}</h2>
-                  <p>{selectedLesson.content}</p>
-                  {selectedLesson.image_url && <img className="lesson-image" src={selectedLesson.image_url} alt="" />}
-                  {selectedLesson.video_url && (
-                    <>
-                      <div className="video-frame">
-                        <iframe
-                          src={getEmbedVideoUrl(selectedLesson.video_url)}
-                          title={selectedLesson.title}
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                          allowFullScreen
-                          referrerPolicy="strict-origin-when-cross-origin"
-                        />
+                <div className={selectedLesson.image_url || selectedLesson.video_url ? "student-module-overview has-media" : "student-module-overview"}>
+                  <div className="student-module-copy">
+                    <span>Модуль {selectedLesson.order_index}</span>
+                    <h2>{selectedLesson.title}</h2>
+                    <p>{selectedLesson.content}</p>
+                  </div>
+
+                  {(selectedLesson.image_url || selectedLesson.video_url) && (
+                    <aside className="student-module-media">
+                      <div className="student-module-task-heading">
+                        <Video size={20} />
+                        <h3>Материалы модуля</h3>
                       </div>
-                      <a className="video-open-link" href={selectedLesson.video_url} target="_blank" rel="noreferrer">
-                        Открыть видео в новом окне
-                      </a>
-                    </>
+                      {selectedLesson.image_url && <img className="lesson-image" src={selectedLesson.image_url} alt="" />}
+                      {selectedLesson.video_url && (
+                        <div>
+                          <div className="video-frame">
+                            <iframe
+                              src={getEmbedVideoUrl(selectedLesson.video_url)}
+                              title={selectedLesson.title}
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                              allowFullScreen
+                              referrerPolicy="strict-origin-when-cross-origin"
+                            />
+                          </div>
+                          <a className="video-open-link" href={selectedLesson.video_url} target="_blank" rel="noreferrer">
+                            Открыть видео в новом окне
+                          </a>
+                        </div>
+                      )}
+                    </aside>
                   )}
                 </div>
 
