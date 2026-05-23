@@ -392,7 +392,7 @@ export function TeacherPage() {
 
   return (
     <Layout>
-      <section className="dashboard-hero">
+      <section className="dashboard-hero teacher-hero">
         <div>
           <span className="eyebrow">Авторский кабинет</span>
           <h1>Мои курсы, задания и прогресс участников</h1>

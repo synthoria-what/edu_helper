@@ -1,23 +1,19 @@
-import { ArrowRight, Award, Clock, GraduationCap, PencilRuler, Search, Target } from "lucide-react";
+import { ArrowRight, BookOpen, Clock, GraduationCap, Layers3, PencilRuler, Search } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { api } from "../api";
-import { useAuth } from "../auth";
 import { Layout } from "../components/Layout";
 import { formatCoursePrice, formatTaskCount } from "../format";
-import type { Certificate, CompletedTask, CourseListItem, ProgressSummary } from "../types";
+import type { CourseListItem, ProgressSummary } from "../types";
 
-const COURSES_PER_PAGE = 6;
+const COURSES_PER_PAGE = 9;
 
 export function DashboardPage() {
-  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const ownerId = searchParams.get("owner_id") ?? "";
   const [courses, setCourses] = useState<CourseListItem[]>([]);
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
-  const [certificates, setCertificates] = useState<Certificate[]>([]);
-  const [completedTasks, setCompletedTasks] = useState<CompletedTask[]>([]);
   const [query, setQuery] = useState("");
   const [priceFilter, setPriceFilter] = useState("");
   const [directionFilter, setDirectionFilter] = useState("");
@@ -34,12 +30,10 @@ export function DashboardPage() {
       owner_id: ownerId,
     },
   ) {
-    Promise.all([api.courses(filters), api.progress(), api.certificates(), api.completedTasks()])
-      .then(([coursesResponse, progressResponse, certificateResponse, completedTaskResponse]) => {
+    Promise.all([api.courses(filters), api.progress()])
+      .then(([coursesResponse, progressResponse]) => {
         setCourses(coursesResponse);
         setSummary(progressResponse);
-        setCertificates(certificateResponse);
-        setCompletedTasks(completedTaskResponse);
         setPage(1);
       })
       .catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Не удалось загрузить данные"));
@@ -72,7 +66,7 @@ export function DashboardPage() {
 
   return (
     <Layout>
-      <section className="dashboard-hero">
+      <section className="dashboard-hero dashboard-home-hero">
         <div>
           <span className="eyebrow">Учебная платформа</span>
           <h1>Дополнительные курсы с интерактивными заданиями</h1>
@@ -84,17 +78,17 @@ export function DashboardPage() {
         </div>
         <div className="summary-strip">
           <SummaryItem icon={<GraduationCap size={20} />} label="Курсы" value={summary?.courses_total ?? 0} />
-          <SummaryItem icon={<Target size={20} />} label="Задания" value={summary?.completed_tasks ?? 0} />
-          <SummaryItem icon={<Award size={20} />} label="Сертификаты" value={summary?.completed_courses ?? 0} />
+          <SummaryItem icon={<BookOpen size={20} />} label="Найдено" value={courses.length} />
+          <SummaryItem icon={<Layers3 size={20} />} label="Направления" value={directions.length} />
         </div>
       </section>
 
       {error && <div className="form-error">{error}</div>}
 
-      <section className="content-section">
+      <section className="content-section dashboard-home-section">
         <div className="section-heading">
           <h2>Поиск курсов</h2>
-          <span>{summary?.average_progress ?? 0}% общего прогресса</span>
+          <span>{courses.length} найдено</span>
         </div>
         <form className="course-search-panel" onSubmit={submitSearch}>
           <label className="search-input">
@@ -180,51 +174,6 @@ export function DashboardPage() {
         )}
       </section>
 
-      <section className="content-section progress-history-section">
-        <div className="history-column">
-          <div className="section-heading">
-            <h2>Сертификаты</h2>
-            <span>{certificates.length}</span>
-          </div>
-          <div className="history-list">
-            {certificates.length ? (
-              certificates.map((certificate) => (
-                <Link className="history-item" key={certificate.id} to={`/courses/${certificate.course_id}/certificate`}>
-                  <strong>{certificate.course_title}</strong>
-                  <span>{certificate.code}</span>
-                  <small>
-                    {certificate.student_name} · {new Date(certificate.issued_at).toLocaleDateString("ru-RU")}
-                  </small>
-                </Link>
-              ))
-            ) : (
-              <p className="helper-text">Здесь появятся сертификаты после завершения курсов.</p>
-            )}
-          </div>
-        </div>
-        <div className="history-column">
-          <div className="section-heading">
-            <h2>Выполненные задания</h2>
-            <span>{completedTasks.length}</span>
-          </div>
-          <div className="history-list">
-            {completedTasks.length ? (
-              completedTasks.slice(0, 8).map((task) => (
-                <Link className="history-item" key={`${task.user_id}-${task.task_id}`} to={`/courses/${task.course_id}`}>
-                  <strong>{task.task_title}</strong>
-                  <span>{task.course_title} · {task.lesson_title}</span>
-                  <small>
-                    {user?.role !== "student" ? `${task.student_name} · ` : ""}
-                    {new Date(task.completed_at).toLocaleDateString("ru-RU")}
-                  </small>
-                </Link>
-              ))
-            ) : (
-              <p className="helper-text">После правильных ответов здесь будет история выполненных заданий.</p>
-            )}
-          </div>
-        </div>
-      </section>
     </Layout>
   );
 }

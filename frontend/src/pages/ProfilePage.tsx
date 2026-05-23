@@ -1,11 +1,11 @@
-import { Award, BookOpen, Camera, LockKeyhole, Save, UserRound } from "lucide-react";
+import { Award, BookOpen, Camera, CheckCircle2, LockKeyhole, Save, UserRound } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { Layout } from "../components/Layout";
-import type { Certificate, CourseListItem } from "../types";
+import type { Certificate, CompletedTask, CourseListItem } from "../types";
 
 export function ProfilePage() {
   const { user, refreshUser } = useAuth();
@@ -17,14 +17,16 @@ export function ProfilePage() {
   const [createdCourses, setCreatedCourses] = useState<CourseListItem[]>([]);
   const [enrolledCourses, setEnrolledCourses] = useState<CourseListItem[]>([]);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const [completedTasks, setCompletedTasks] = useState<CompletedTask[]>([]);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    Promise.all([api.myCourses(), api.enrolledCourses(), api.certificates()])
-      .then(([created, enrolled, certs]) => {
+    Promise.all([api.myCourses(), api.enrolledCourses(), api.certificates(), api.completedTasks()])
+      .then(([created, enrolled, certs, tasks]) => {
         setCreatedCourses(created);
         setEnrolledCourses(enrolled);
         setCertificates(certs);
+        setCompletedTasks(tasks);
       })
       .catch((error) => setMessage(error instanceof Error ? error.message : "Не удалось загрузить профиль"));
   }, []);
@@ -67,11 +69,11 @@ export function ProfilePage() {
 
   return (
     <Layout>
-      <section className="dashboard-hero">
+      <section className="dashboard-hero profile-hero">
         <div>
           <span className="eyebrow">Профиль</span>
           <h1>{user?.full_name}</h1>
-          <p>Личные данные, созданные курсы, обучение и сертификаты.</p>
+          <p>Личные данные, обучение, сертификаты и история выполненных заданий.</p>
         </div>
         <div className="profile-avatar-card">
           {avatarUrl ? <img src={avatarUrl} alt="" /> : <UserRound size={48} />}
@@ -85,7 +87,7 @@ export function ProfilePage() {
 
       {message && <div className="teacher-message">{message}</div>}
 
-      <section className="profile-grid">
+      <section className="profile-grid profile-grid--forms">
         <form className="teacher-panel teacher-form" onSubmit={saveProfile}>
           <h2>Данные аккаунта</h2>
           <label>
@@ -123,10 +125,11 @@ export function ProfilePage() {
         </form>
       </section>
 
-      <section className="profile-grid">
+      <section className="profile-grid profile-grid--history">
         <CourseList title="Мои курсы" icon={<BookOpen size={20} />} courses={createdCourses} />
         <CourseList title="Я прохожу" icon={<BookOpen size={20} />} courses={enrolledCourses} />
         <CourseList title="Пройденные" icon={<Award size={20} />} courses={completedCourses} />
+        <TaskList tasks={completedTasks} showStudent={user?.role !== "student"} />
         <div className="teacher-panel">
           <div className="panel-title">
             <Award size={20} />
@@ -160,6 +163,29 @@ function CourseList({ title, icon, courses }: { title: string; icon: React.React
             <span>{course.direction} · {course.progress_percent}%</span>
           </Link>
         )) : <p className="helper-text">Пока пусто.</p>}
+      </div>
+    </div>
+  );
+}
+
+function TaskList({ tasks, showStudent }: { tasks: CompletedTask[]; showStudent: boolean }) {
+  return (
+    <div className="teacher-panel">
+      <div className="panel-title">
+        <CheckCircle2 size={20} />
+        <h2>Выполненные задания</h2>
+      </div>
+      <div className="history-list">
+        {tasks.length ? tasks.slice(0, 12).map((task) => (
+          <Link className="history-item" key={`${task.user_id}-${task.task_id}`} to={`/courses/${task.course_id}`}>
+            <strong>{task.task_title}</strong>
+            <span>{task.course_title} · {task.lesson_title}</span>
+            <small>
+              {showStudent ? `${task.student_name} · ` : ""}
+              {new Date(task.completed_at).toLocaleDateString("ru-RU")}
+            </small>
+          </Link>
+        )) : <p className="helper-text">После правильных ответов здесь будет история выполненных заданий.</p>}
       </div>
     </div>
   );
