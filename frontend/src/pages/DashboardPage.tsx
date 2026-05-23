@@ -59,7 +59,11 @@ export function DashboardPage() {
           {courses.length ? (
             courses.map((course) => (
               <article className="course-card" key={course.id}>
-                {course.image_url && <img className="course-card-image" src={course.image_url} alt="" />}
+                {course.image_url && (
+                  <div className="course-card-media" style={{ "--course-image": `url(${course.image_url})` } as React.CSSProperties}>
+                    <img className="course-card-image" src={course.image_url} alt="" />
+                  </div>
+                )}
                 <div className="course-meta">
                   <span>{course.direction}</span>
                   <span>{course.level}</span>
