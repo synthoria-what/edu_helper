@@ -19,7 +19,7 @@ import {
   X,
   Underline,
 } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { api } from "../api";
 import { Layout } from "../components/Layout";
@@ -1096,11 +1096,50 @@ function RichTextEditor({
   onChange: (value: string) => void;
   onError: (message: string) => void;
 }) {
-  const editorRef = useMemo(() => ({ current: null as HTMLDivElement | null }), []);
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const selectionRef = useRef<Range | null>(null);
+  const lastHtmlRef = useRef(value);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || value === lastHtmlRef.current || value === editor.innerHTML) {
+      return;
+    }
+    editor.innerHTML = value || "";
+    lastHtmlRef.current = value || "";
+  }, [value]);
+
+  function saveSelection() {
+    const editor = editorRef.current;
+    const selection = window.getSelection();
+    if (!editor || !selection?.rangeCount) return;
+
+    const range = selection.getRangeAt(0);
+    if (editor.contains(range.commonAncestorContainer)) {
+      selectionRef.current = range.cloneRange();
+    }
+  }
+
+  function restoreSelection() {
+    const selection = window.getSelection();
+    if (!selectionRef.current || !selection) return;
+
+    selection.removeAllRanges();
+    selection.addRange(selectionRef.current);
+  }
+
+  function syncValue() {
+    const nextValue = editorRef.current?.innerHTML ?? "";
+    lastHtmlRef.current = nextValue;
+    onChange(nextValue);
+  }
 
   function command(name: string, commandValue?: string) {
+    editorRef.current?.focus();
+    restoreSelection();
     document.execCommand(name, false, commandValue);
-    onChange(editorRef.current?.innerHTML ?? "");
+    syncValue();
+    saveSelection();
   }
 
   async function insertImage(file: File | undefined) {
@@ -1114,18 +1153,18 @@ function RichTextEditor({
   }
 
   return (
-    <label className="rich-editor-field">
-      {label}
+    <div className="rich-editor-field">
+      <span>{label}</span>
       <div className="rich-editor-toolbar">
-        <button type="button" className="icon-button" onClick={() => command("bold")} title="Полужирный"><Bold size={16} /></button>
-        <button type="button" className="icon-button" onClick={() => command("italic")} title="Курсив"><Italic size={16} /></button>
-        <button type="button" className="icon-button" onClick={() => command("underline")} title="Подчеркнутый"><Underline size={16} /></button>
-        <select onChange={(event) => command("fontSize", event.target.value)} defaultValue="3" title="Размер">
+        <button type="button" className="icon-button" onMouseDown={(event) => event.preventDefault()} onClick={() => command("bold")} title="Полужирный"><Bold size={16} /></button>
+        <button type="button" className="icon-button" onMouseDown={(event) => event.preventDefault()} onClick={() => command("italic")} title="Курсив"><Italic size={16} /></button>
+        <button type="button" className="icon-button" onMouseDown={(event) => event.preventDefault()} onClick={() => command("underline")} title="Подчеркнутый"><Underline size={16} /></button>
+        <select onMouseDown={saveSelection} onChange={(event) => command("fontSize", event.target.value)} defaultValue="3" title="Размер">
           <option value="2">Мелкий</option>
           <option value="3">Обычный</option>
           <option value="5">Крупный</option>
         </select>
-        <label className="file-picker compact" title="Вставить картинку">
+        <label className="file-picker compact" onMouseDown={saveSelection} title="Вставить картинку">
           <Image size={18} />
           <input
             aria-label="Вставить картинку"
@@ -1141,13 +1180,18 @@ function RichTextEditor({
       <div
         className="rich-editor"
         contentEditable
-        dangerouslySetInnerHTML={{ __html: value }}
-        onBlur={(event) => onChange(event.currentTarget.innerHTML)}
-        ref={(node) => {
-          editorRef.current = node;
+        dangerouslySetInnerHTML={{ __html: lastHtmlRef.current }}
+        onBlur={() => {
+          saveSelection();
+          syncValue();
         }}
+        onInput={syncValue}
+        onKeyUp={saveSelection}
+        onMouseUp={saveSelection}
+        ref={editorRef}
+        suppressContentEditableWarning
       />
-    </label>
+    </div>
   );
 }
 
