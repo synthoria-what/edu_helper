@@ -6,7 +6,8 @@ from app.security import get_password_hash
 
 
 async def seed_demo_data(session: AsyncSession) -> None:
-    await ensure_course_columns(session)
+    await ensure_platform_columns(session)
+    await ensure_task_type_enum(session)
     await seed_demo_users(session)
     await normalize_legacy_teacher_roles(session)
     await backfill_course_owners(session)
@@ -19,6 +20,15 @@ async def seed_demo_data(session: AsyncSession) -> None:
     course = Course(
         title="Цифровая грамотность студента",
         description="Короткий курс о безопасной работе с информацией, учебными сервисами и данными.",
+        description_html=(
+            "<p>Короткий курс о безопасной работе с информацией, учебными сервисами и данными.</p>"
+            "<p>Подходит для первого знакомства с цифровой учебной средой.</p>"
+        ),
+        learning_goals=[
+            "Отличать надежные учебные источники от сомнительных",
+            "Защищать учебные аккаунты и персональные данные",
+            "Анализировать простые учебные данные",
+        ],
         direction="Общие компетенции",
         level="Базовый",
         duration_minutes=55,
@@ -101,17 +111,44 @@ async def seed_demo_data(session: AsyncSession) -> None:
     await session.commit()
 
 
-async def ensure_course_columns(session: AsyncSession) -> None:
+async def ensure_platform_columns(session: AsyncSession) -> None:
     bind = session.get_bind()
     if bind.dialect.name != "postgresql":
         return
 
+    await session.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500)"))
     await session.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS image_url VARCHAR(500)"))
     await session.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS price_rubles INTEGER NOT NULL DEFAULT 0"))
     await session.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES users(id) ON DELETE SET NULL"))
+    await session.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS description_html TEXT NOT NULL DEFAULT ''"))
+    await session.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS learning_goals JSONB NOT NULL DEFAULT '[]'::jsonb"))
     await session.execute(text("ALTER TABLE lessons ADD COLUMN IF NOT EXISTS image_url VARCHAR(500)"))
     await session.execute(text("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS image_url VARCHAR(500)"))
+    await session.execute(text("ALTER TABLE tasks ALTER COLUMN correct_answer TYPE VARCHAR(1000)"))
+    await session.execute(text("ALTER TABLE task_results ALTER COLUMN answer TYPE TEXT"))
+    await session.execute(
+        text(
+            "CREATE TABLE IF NOT EXISTS course_enrollments ("
+            "id SERIAL PRIMARY KEY, "
+            "user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, "
+            "course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE, "
+            "enrolled_at TIMESTAMP WITH TIME ZONE DEFAULT now(), "
+            "CONSTRAINT uq_user_course_enrollment UNIQUE (user_id, course_id)"
+            ")"
+        )
+    )
+    await session.execute(text("UPDATE courses SET description_html = description WHERE description_html = ''"))
     await session.commit()
+
+
+async def ensure_task_type_enum(session: AsyncSession) -> None:
+    bind = session.get_bind()
+    if bind.dialect.name != "postgresql":
+        return
+
+    for value in ("multi_choice", "text_input", "order"):
+        await session.execute(text(f"ALTER TYPE tasktype ADD VALUE IF NOT EXISTS '{value}'"))
+        await session.commit()
 
 
 async def normalize_legacy_teacher_roles(session: AsyncSession) -> None:

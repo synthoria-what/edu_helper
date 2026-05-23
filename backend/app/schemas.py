@@ -22,6 +22,7 @@ class UserRead(BaseModel):
     full_name: str
     email: EmailStr
     role: UserRole
+    avatar_url: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -38,6 +39,21 @@ class UserAdminRead(UserRead):
 
 class UserRoleUpdate(BaseModel):
     role: UserRole
+
+
+class UserProfileUpdate(BaseModel):
+    full_name: str = Field(min_length=2, max_length=160)
+    email: EmailStr
+    avatar_url: str | None = Field(default=None, max_length=500)
+
+
+class PasswordUpdate(BaseModel):
+    current_password: str = Field(min_length=6, max_length=128)
+    new_password: str = Field(min_length=6, max_length=128)
+
+
+class AdminPasswordUpdate(BaseModel):
+    password: str = Field(min_length=6, max_length=128)
 
 
 class TaskResultRead(BaseModel):
@@ -80,14 +96,20 @@ class CourseListItem(BaseModel):
     id: int
     title: str
     description: str
+    description_html: str
+    learning_goals: list[str] = Field(default_factory=list)
     direction: str
     level: str
     duration_minutes: int
     price_rubles: int
     image_url: str | None = None
+    owner_name: str
+    lessons_count: int
     total_tasks: int
     completed_tasks: int
     progress_percent: int
+    is_enrolled: bool
+    can_edit: bool
 
     model_config = {"from_attributes": True}
 
@@ -98,7 +120,7 @@ class CourseDetail(CourseListItem):
 
 
 class SubmitTaskRequest(BaseModel):
-    answer: str = Field(min_length=1, max_length=255)
+    answer: str = Field(min_length=1, max_length=2000)
 
 
 class SubmitTaskResponse(BaseModel):
@@ -140,6 +162,8 @@ class CompletedTaskRead(BaseModel):
 class CourseMutation(BaseModel):
     title: str = Field(min_length=3, max_length=180)
     description: str = Field(min_length=10)
+    description_html: str = Field(default="", max_length=20000)
+    learning_goals: list[str] = Field(default_factory=list, max_length=20)
     direction: str = Field(min_length=2, max_length=120)
     level: str = Field(min_length=2, max_length=80)
     duration_minutes: int = Field(ge=5, le=600)
@@ -160,7 +184,7 @@ class TaskMutation(BaseModel):
     title: str = Field(min_length=3, max_length=180)
     prompt: str = Field(min_length=5)
     payload: dict = Field(default_factory=dict)
-    correct_answer: str = Field(min_length=1, max_length=255)
+    correct_answer: str = Field(min_length=1, max_length=1000)
     image_url: str | None = Field(default=None, max_length=500)
     order_index: int = Field(ge=1, le=999)
 
@@ -174,3 +198,11 @@ class CourseProgressStudent(BaseModel):
     progress_percent: int
     certificate_code: str | None = None
     completed_task_titles: list[str] = Field(default_factory=list)
+
+
+class ProfileSummary(BaseModel):
+    user: UserRead
+    created_courses: list[CourseListItem]
+    enrolled_courses: list[CourseListItem]
+    completed_courses: list[CourseListItem]
+    certificates: list[CertificateRead]

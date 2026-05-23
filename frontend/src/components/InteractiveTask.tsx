@@ -1,4 +1,4 @@
-import { BarChart3, CheckCircle2, Lightbulb, Send, XCircle } from "lucide-react";
+import { ArrowDown, ArrowUp, BarChart3, CheckCircle2, Lightbulb, Send, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
@@ -17,6 +17,11 @@ type InteractiveTaskProps = {
 
 export function InteractiveTask({ task, onSolved }: InteractiveTaskProps) {
   const [answer, setAnswer] = useState(task.result?.answer ?? "");
+  const [selectedOptions, setSelectedOptions] = useState<string[]>(() => (task.result?.answer ? task.result.answer.split("|") : []));
+  const [orderedItems, setOrderedItems] = useState<string[]>(() => {
+    const rawItems = task.payload.items;
+    return Array.isArray(rawItems) ? shuffleItems(rawItems.map(String)) : [];
+  });
   const [status, setStatus] = useState(task.result?.is_correct ? "Верно" : "");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -124,6 +129,68 @@ export function InteractiveTask({ task, onSolved }: InteractiveTaskProps) {
         </>
       )}
 
+      {task.type === "text_input" && (
+        <AnswerForm
+          answer={answer}
+          isSubmitting={isSubmitting}
+          setAnswer={setAnswer}
+          submit={() => void submit()}
+        />
+      )}
+
+      {task.type === "multi_choice" && (
+        <>
+          <div className="option-grid">
+            {shuffledOptions.map((option, index) => {
+              const isSelected = selectedOptions.includes(option);
+              return (
+                <button
+                  className={isSelected ? "option-button option-button--active" : "option-button"}
+                  disabled={isSubmitting}
+                  key={`${option}-${index}`}
+                  type="button"
+                  onClick={() => {
+                    setSelectedOptions((current) =>
+                      current.includes(option) ? current.filter((item) => item !== option) : [...current, option],
+                    );
+                  }}
+                >
+                  {option}
+                </button>
+              );
+            })}
+          </div>
+          <button className="primary-button" type="button" disabled={isSubmitting || !selectedOptions.length} onClick={() => void submit(selectedOptions.join("|"))}>
+            <Send size={18} />
+            Отправить
+          </button>
+        </>
+      )}
+
+      {task.type === "order" && (
+        <>
+          <div className="order-list">
+            {orderedItems.map((item, index) => (
+              <div className="order-item" key={`${item}-${index}`}>
+                <span>{item}</span>
+                <div>
+                  <button className="icon-button" type="button" disabled={index === 0 || isSubmitting} onClick={() => setOrderedItems(moveItem(orderedItems, index, index - 1))} title="Выше">
+                    <ArrowUp size={16} />
+                  </button>
+                  <button className="icon-button" type="button" disabled={index === orderedItems.length - 1 || isSubmitting} onClick={() => setOrderedItems(moveItem(orderedItems, index, index + 1))} title="Ниже">
+                    <ArrowDown size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button className="primary-button" type="button" disabled={isSubmitting || !orderedItems.length} onClick={() => void submit(orderedItems.join("|"))}>
+            <Send size={18} />
+            Проверить порядок
+          </button>
+        </>
+      )}
+
       {status && (
         <div className={isCorrect ? "task-status task-status--success" : "task-status"}>
           {isCorrect ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
@@ -132,6 +199,13 @@ export function InteractiveTask({ task, onSolved }: InteractiveTaskProps) {
       )}
     </section>
   );
+}
+
+function moveItem<T>(items: T[], fromIndex: number, toIndex: number): T[] {
+  const next = [...items];
+  const [item] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, item);
+  return next;
 }
 
 function shuffleItems<T>(items: T[]): T[] {

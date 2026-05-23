@@ -5,7 +5,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_session
 from app.dependencies import get_current_user
 from app.models import User, UserRole
-from app.schemas import LoginRequest, TokenResponse, UserAdminRead, UserCreate, UserRead, UserRoleUpdate
+from app.schemas import (
+    AdminPasswordUpdate,
+    LoginRequest,
+    PasswordUpdate,
+    TokenResponse,
+    UserAdminRead,
+    UserCreate,
+    UserProfileUpdate,
+    UserRead,
+    UserRoleUpdate,
+)
 from app.security import create_access_token, get_password_hash, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -50,6 +60,39 @@ async def me(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 
+@router.put("/me", response_model=UserRead)
+async def update_me(
+    payload: UserProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserRead:
+    existing_user = await session.scalar(select(User).where(User.email == payload.email.lower(), User.id != current_user.id))
+    if existing_user:
+        raise HTTPException(status_code=409, detail="Пользователь с таким email уже существует")
+
+    current_user.full_name = payload.full_name
+    current_user.email = payload.email.lower()
+    current_user.avatar_url = payload.avatar_url
+    await session.commit()
+    await session.refresh(current_user)
+    return UserRead.model_validate(current_user)
+
+
+@router.put("/me/password", response_model=UserRead)
+async def update_my_password(
+    payload: PasswordUpdate,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserRead:
+    if not verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Текущий пароль указан неверно")
+
+    current_user.hashed_password = get_password_hash(payload.new_password)
+    await session.commit()
+    await session.refresh(current_user)
+    return UserRead.model_validate(current_user)
+
+
 @router.get("/users", response_model=list[UserAdminRead])
 async def list_users(
     current_user: User = Depends(get_current_user),
@@ -75,6 +118,24 @@ async def update_user_role(
         raise HTTPException(status_code=400, detail="Свою роль можно менять только напрямую в базе")
 
     user.role = payload.role
+    await session.commit()
+    await session.refresh(user)
+    return UserRead.model_validate(user)
+
+
+@router.put("/users/{user_id}/password", response_model=UserRead)
+async def update_user_password(
+    user_id: str,
+    payload: AdminPasswordUpdate,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> UserRead:
+    require_admin(current_user)
+    user = await session.scalar(select(User).where(User.id == user_id))
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    user.hashed_password = get_password_hash(payload.password)
     await session.commit()
     await session.refresh(user)
     return UserRead.model_validate(user)

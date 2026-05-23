@@ -3,6 +3,7 @@ export type User = {
   full_name: string;
   email: string;
   role: "student" | "admin";
+  avatar_url: string | null;
 };
 
 export type UserRole = User["role"];
@@ -21,7 +22,7 @@ export type TaskResult = {
   completed_at: string;
 };
 
-export type TaskType = "quiz" | "chart" | "rebus";
+export type TaskType = "quiz" | "chart" | "rebus" | "multi_choice" | "text_input" | "order";
 
 export type Task = {
   id: number;
@@ -49,14 +50,20 @@ export type CourseListItem = {
   id: number;
   title: string;
   description: string;
+  description_html: string;
+  learning_goals: string[];
   direction: string;
   level: string;
   duration_minutes: number;
   price_rubles: number;
   image_url: string | null;
+  owner_name: string;
+  lessons_count: number;
   total_tasks: number;
   completed_tasks: number;
   progress_percent: number;
+  is_enrolled: boolean;
+  can_edit: boolean;
 };
 
 export type Certificate = {
@@ -98,6 +105,8 @@ export type CompletedTask = {
 export type CourseMutation = {
   title: string;
   description: string;
+  description_html: string;
+  learning_goals: string[];
   direction: string;
   level: string;
   duration_minutes: number;

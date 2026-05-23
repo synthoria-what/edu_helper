@@ -8,6 +8,7 @@ type AuthContextValue = {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (fullName: string, email: string, password: string) => Promise<void>;
+  refreshUser: () => Promise<void>;
   logout: () => void;
 };
 
@@ -44,6 +45,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setToken(response.access_token);
         setUser(response.user);
       },
+      async refreshUser() {
+        setUser(await api.me());
+      },
       logout() {
         clearToken();
         setUser(null);
@@ -62,4 +66,3 @@ export function useAuth(): AuthContextValue {
   }
   return context;
 }
-

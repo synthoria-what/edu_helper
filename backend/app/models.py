@@ -19,6 +19,9 @@ class TaskType(str, enum.Enum):
     quiz = "quiz"
     chart = "chart"
     rebus = "rebus"
+    multi_choice = "multi_choice"
+    text_input = "text_input"
+    order = "order"
 
 
 class User(Base):
@@ -29,11 +32,13 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255))
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.student)
+    avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     results: Mapped[list["TaskResult"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     certificates: Mapped[list["Certificate"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     courses: Mapped[list["Course"]] = relationship(back_populates="owner")
+    enrollments: Mapped[list["CourseEnrollment"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class Course(Base):
@@ -42,6 +47,8 @@ class Course(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String(180))
     description: Mapped[str] = mapped_column(Text)
+    description_html: Mapped[str] = mapped_column(Text, default="")
+    learning_goals: Mapped[list[str]] = mapped_column(JSONB, default=list)
     direction: Mapped[str] = mapped_column(String(120))
     level: Mapped[str] = mapped_column(String(80))
     duration_minutes: Mapped[int] = mapped_column(Integer, default=45)
@@ -54,6 +61,7 @@ class Course(Base):
     )
 
     owner: Mapped[User | None] = relationship(back_populates="courses")
+    enrollments: Mapped[list["CourseEnrollment"]] = relationship(back_populates="course", cascade="all, delete-orphan")
     lessons: Mapped[list["Lesson"]] = relationship(
         back_populates="course",
         cascade="all, delete-orphan",
@@ -90,7 +98,7 @@ class Task(Base):
     title: Mapped[str] = mapped_column(String(180))
     prompt: Mapped[str] = mapped_column(Text)
     payload: Mapped[dict] = mapped_column(JSONB, default=dict)
-    correct_answer: Mapped[str] = mapped_column(String(255))
+    correct_answer: Mapped[str] = mapped_column(String(1000))
     image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     order_index: Mapped[int] = mapped_column(Integer, default=0)
 
@@ -105,13 +113,26 @@ class TaskResult(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
     task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"))
-    answer: Mapped[str] = mapped_column(String(255))
+    answer: Mapped[str] = mapped_column(Text)
     is_correct: Mapped[bool] = mapped_column(Boolean, default=False)
     score: Mapped[int] = mapped_column(Integer, default=0)
     completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="results")
     task: Mapped[Task] = relationship(back_populates="results")
+
+
+class CourseEnrollment(Base):
+    __tablename__ = "course_enrollments"
+    __table_args__ = (UniqueConstraint("user_id", "course_id", name="uq_user_course_enrollment"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"))
+    enrolled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped[User] = relationship(back_populates="enrollments")
+    course: Mapped[Course] = relationship(back_populates="enrollments")
 
 
 class Certificate(Base):

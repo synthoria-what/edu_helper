@@ -1,5 +1,6 @@
 import { ShieldCheck, Users } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { api } from "../api";
 import { useAuth } from "../auth";
@@ -36,6 +37,17 @@ export function AdminPage() {
       setMessage("Роль обновлена");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Не удалось изменить роль");
+    }
+  }
+
+  async function changePassword(userId: string) {
+    const password = window.prompt("Новый пароль пользователя");
+    if (!password) return;
+    try {
+      await api.updateUserPassword(userId, password);
+      setMessage("Пароль обновлен");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Не удалось изменить пароль");
     }
   }
 
@@ -109,6 +121,14 @@ export function AdminPage() {
                       <option value="student">Пользователь</option>
                       <option value="admin">Администратор</option>
                     </select>
+                  </div>
+                  <div className="admin-user-actions">
+                    <Link className="secondary-button" to={`/?owner_id=${item.id}`}>
+                      Курсы
+                    </Link>
+                    <button className="secondary-button" type="button" onClick={() => void changePassword(item.id)}>
+                      Пароль
+                    </button>
                   </div>
                   {isCurrentAdmin && <small className="helper-text">Свою роль нельзя изменить из интерфейса.</small>}
                 </article>

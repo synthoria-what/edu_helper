@@ -1,6 +1,6 @@
-import { ArrowRight, Award, Clock, GraduationCap, PencilRuler, Target } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { ArrowRight, Award, Clock, GraduationCap, PencilRuler, Search, Target } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { api } from "../api";
 import { useAuth } from "../auth";
@@ -10,14 +10,19 @@ import type { Certificate, CompletedTask, CourseListItem, ProgressSummary } from
 
 export function DashboardPage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [courses, setCourses] = useState<CourseListItem[]>([]);
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [completedTasks, setCompletedTasks] = useState<CompletedTask[]>([]);
+  const [query, setQuery] = useState("");
+  const [priceFilter, setPriceFilter] = useState("");
+  const [directionFilter, setDirectionFilter] = useState("");
+  const [levelFilter, setLevelFilter] = useState("");
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    Promise.all([api.courses(), api.progress(), api.certificates(), api.completedTasks()])
+  async function loadDashboard(filters: { q?: string; price?: string; direction?: string; level?: string; owner_id?: string } = { q: query, price: priceFilter, direction: directionFilter, level: levelFilter }) {
+    Promise.all([api.courses(filters), api.progress(), api.certificates(), api.completedTasks()])
       .then(([coursesResponse, progressResponse, certificateResponse, completedTaskResponse]) => {
         setCourses(coursesResponse);
         setSummary(progressResponse);
@@ -25,7 +30,28 @@ export function DashboardPage() {
         setCompletedTasks(completedTaskResponse);
       })
       .catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Не удалось загрузить данные"));
-  }, []);
+  }
+
+  useEffect(() => {
+    const ownerId = searchParams.get("owner_id") ?? "";
+    void loadDashboard({ q: "", price: "", direction: "", level: "", owner_id: ownerId });
+  }, [searchParams]);
+
+  const directions = useMemo(() => Array.from(new Set(courses.map((course) => course.direction))).sort(), [courses]);
+  const levels = useMemo(() => Array.from(new Set(courses.map((course) => course.level))).sort(), [courses]);
+
+  function submitSearch(event: FormEvent) {
+    event.preventDefault();
+    void loadDashboard();
+  }
+
+  function resetFilters() {
+    setQuery("");
+    setPriceFilter("");
+    setDirectionFilter("");
+    setLevelFilter("");
+    void loadDashboard({ q: "", price: "", direction: "", level: "" });
+  }
 
   return (
     <Layout>
@@ -50,9 +76,30 @@ export function DashboardPage() {
 
       <section className="content-section">
         <div className="section-heading">
-          <h2>Доступные курсы</h2>
+          <h2>Поиск курсов</h2>
           <span>{summary?.average_progress ?? 0}% общего прогресса</span>
         </div>
+        <form className="course-search-panel" onSubmit={submitSearch}>
+          <label className="search-input">
+            <Search size={18} />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Название курса, автор или предмет" />
+          </label>
+          <select value={priceFilter} onChange={(event) => setPriceFilter(event.target.value)}>
+            <option value="">Любая цена</option>
+            <option value="free">Бесплатные</option>
+            <option value="paid">Платные</option>
+          </select>
+          <select value={directionFilter} onChange={(event) => setDirectionFilter(event.target.value)}>
+            <option value="">Все направления</option>
+            {directions.map((direction) => <option key={direction} value={direction}>{direction}</option>)}
+          </select>
+          <select value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)}>
+            <option value="">Все уровни</option>
+            {levels.map((level) => <option key={level} value={level}>{level}</option>)}
+          </select>
+          <button className="primary-button" type="submit">Искать</button>
+          <button className="secondary-button" type="button" onClick={resetFilters}>Сбросить</button>
+        </form>
         <div className="course-grid">
           {courses.length ? (
             courses.map((course) => (
@@ -73,6 +120,7 @@ export function DashboardPage() {
                   <span>{formatCoursePrice(course.price_rubles)}</span>
                 </div>
                 <h3>{course.title}</h3>
+                <small className="course-author">{course.owner_name}</small>
                 <p>{course.description}</p>
                 <div className="progress-line">
                   <span style={{ width: `${course.progress_percent}%` }} />
@@ -83,11 +131,11 @@ export function DashboardPage() {
                     {course.duration_minutes} мин.
                   </span>
                   <span>
-                    {course.completed_tasks}/{formatTaskCount(course.total_tasks)}
+                    {course.lessons_count} уроков · {formatTaskCount(course.total_tasks)}
                   </span>
                 </div>
                 <Link className="secondary-button" to={`/courses/${course.id}`}>
-                  Открыть
+                  Подробнее
                   <ArrowRight size={18} />
                 </Link>
               </article>

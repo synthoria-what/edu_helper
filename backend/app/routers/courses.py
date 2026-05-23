@@ -1,13 +1,16 @@
 import secrets
+import uuid
+from html import escape
+from html.parser import HTMLParser
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import delete, func, select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_session
 from app.dependencies import get_current_user
-from app.models import Certificate, Course, Lesson, Task, TaskResult, User, UserRole
+from app.models import Certificate, Course, CourseEnrollment, Lesson, Task, TaskResult, TaskType, User, UserRole
 from app.schemas import (
     CertificateRead,
     CourseDetail,
@@ -26,8 +29,104 @@ from app.schemas import (
 router = APIRouter(prefix="/courses", tags=["courses"])
 
 
+class CourseHtmlSanitizer(HTMLParser):
+    allowed_tags = {"p", "br", "strong", "b", "em", "i", "u", "ul", "ol", "li", "span", "font", "img"}
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        if tag not in self.allowed_tags:
+            return
+        if tag == "img":
+            attr_map = dict(attrs)
+            src = str(attr_map.get("src", "")).strip()
+            if not src or src.lower().startswith("javascript:"):
+                return
+            alt = escape(str(attr_map.get("alt", "")), quote=True)
+            self.parts.append(f'<img src="{escape(src, quote=True)}" alt="{alt}">')
+            return
+        if tag == "span":
+            style = sanitize_style(dict(attrs).get("style", ""))
+            self.parts.append(f'<span style="{style}">' if style else "<span>")
+            return
+        if tag == "font":
+            size = str(dict(attrs).get("size", "3"))
+            self.parts.append(f'<font size="{escape(size, quote=True)}">' if size in {"1", "2", "3", "4", "5", "6", "7"} else "<font>")
+            return
+        self.parts.append(f"<{tag}>")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in self.allowed_tags and tag not in {"br", "img"}:
+            self.parts.append(f"</{tag}>")
+
+    def handle_data(self, data: str) -> None:
+        self.parts.append(escape(data))
+
+    def get_html(self) -> str:
+        return "".join(self.parts)
+
+
 def normalize_answer(value: str) -> str:
     return value.strip().casefold()
+
+
+def sanitize_style(value: str) -> str:
+    parts = [part.strip() for part in value.split(";")]
+    safe_parts = []
+    for part in parts:
+        if not part.lower().startswith("font-size:"):
+            continue
+        size = part.split(":", 1)[1].strip().lower()
+        if size.endswith("px") and size[:-2].isdigit() and 10 <= int(size[:-2]) <= 36:
+            safe_parts.append(f"font-size: {int(size[:-2])}px")
+    return "; ".join(safe_parts)
+
+
+def sanitize_course_html(value: str) -> str:
+    sanitizer = CourseHtmlSanitizer()
+    sanitizer.feed(value or "")
+    return sanitizer.get_html()
+
+
+def normalize_answer_list(values: list[str]) -> list[str]:
+    return sorted(normalize_answer(value) for value in values if value.strip())
+
+
+def answer_is_correct(task: Task, answer: str) -> bool:
+    if task.type == TaskType.multi_choice:
+        expected = task.payload.get("correct_answers")
+        if not isinstance(expected, list):
+            expected = task.correct_answer.split("|")
+        return normalize_answer_list(answer.split("|")) == normalize_answer_list([str(item) for item in expected])
+    if task.type == TaskType.order:
+        expected = task.payload.get("items")
+        if not isinstance(expected, list):
+            expected = task.correct_answer.split("|")
+        return [normalize_answer(item) for item in answer.split("|")] == [
+            normalize_answer(str(item)) for item in expected if str(item).strip()
+        ]
+    return normalize_answer(answer) == normalize_answer(task.correct_answer)
+
+
+def normalize_task_payload(payload: TaskMutation) -> dict:
+    data = payload.model_dump()
+    if payload.type == TaskType.multi_choice:
+        correct_answers = data["payload"].get("correct_answers")
+        if not isinstance(correct_answers, list):
+            correct_answers = data["correct_answer"].split("|")
+        normalized = [str(item).strip() for item in correct_answers if str(item).strip()]
+        data["payload"] = {**data["payload"], "correct_answers": normalized}
+        data["correct_answer"] = "|".join(normalized)
+    elif payload.type == TaskType.order:
+        items = data["payload"].get("items")
+        if not isinstance(items, list):
+            items = data["correct_answer"].split("|")
+        normalized = [str(item).strip() for item in items if str(item).strip()]
+        data["payload"] = {**data["payload"], "items": normalized}
+        data["correct_answer"] = "|".join(normalized)
+    return data
 
 
 def can_edit_course(course: Course, user: User) -> bool:
@@ -89,19 +188,32 @@ async def get_course_stats(session: AsyncSession, course_id: int, user_id) -> tu
 
 async def build_course_list_item(session: AsyncSession, course: Course, user: User) -> CourseListItem:
     total_tasks, completed_tasks = await get_course_stats(session, course.id, user.id)
+    lessons_count = await session.scalar(select(func.count(Lesson.id)).where(Lesson.course_id == course.id))
+    owner_name = None
+    if course.owner_id:
+        owner_name = await session.scalar(select(User.full_name).where(User.id == course.owner_id))
+    is_enrolled = await session.scalar(
+        select(CourseEnrollment.id).where(CourseEnrollment.course_id == course.id, CourseEnrollment.user_id == user.id)
+    )
     progress_percent = round((completed_tasks / total_tasks) * 100) if total_tasks else 0
     return CourseListItem(
         id=course.id,
         title=course.title,
         description=course.description,
+        description_html=course.description_html or escape(course.description),
+        learning_goals=list(course.learning_goals or []),
         direction=course.direction,
         level=course.level,
         duration_minutes=course.duration_minutes,
         price_rubles=course.price_rubles,
         image_url=course.image_url,
+        owner_name=owner_name or "Автор курса",
+        lessons_count=lessons_count or 0,
         total_tasks=total_tasks,
         completed_tasks=completed_tasks,
         progress_percent=progress_percent,
+        is_enrolled=bool(is_enrolled),
+        can_edit=can_edit_course(course, user),
     )
 
 
@@ -149,10 +261,39 @@ async def assert_task_is_unlocked(session: AsyncSession, task_id: int, user: Use
 
 @router.get("", response_model=list[CourseListItem])
 async def list_courses(
+    q: str | None = Query(default=None),
+    price: str | None = Query(default=None, pattern="^(free|paid)$"),
+    direction: str | None = Query(default=None),
+    level: str | None = Query(default=None),
+    owner_id: str | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[CourseListItem]:
-    courses = (await session.scalars(select(Course).order_by(Course.id))).all()
+    query = select(Course).outerjoin(User, Course.owner_id == User.id).order_by(Course.id)
+    if q:
+        pattern = f"%{q.strip()}%"
+        query = query.where(
+            or_(
+                Course.title.ilike(pattern),
+                Course.description.ilike(pattern),
+                Course.direction.ilike(pattern),
+                User.full_name.ilike(pattern),
+            )
+        )
+    if price == "free":
+        query = query.where(Course.price_rubles == 0)
+    elif price == "paid":
+        query = query.where(Course.price_rubles > 0)
+    if direction:
+        query = query.where(Course.direction == direction)
+    if level:
+        query = query.where(Course.level == level)
+    if owner_id:
+        try:
+            query = query.where(Course.owner_id == uuid.UUID(owner_id))
+        except ValueError:
+            query = query.where(Course.owner_id.is_(None))
+    courses = (await session.scalars(query)).all()
     return [await build_course_list_item(session, course, current_user) for course in courses]
 
 
@@ -168,16 +309,48 @@ async def list_my_courses(
     return [await build_course_list_item(session, course, current_user) for course in courses]
 
 
+@router.get("/enrolled", response_model=list[CourseListItem])
+async def list_enrolled_courses(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[CourseListItem]:
+    courses = (
+        await session.scalars(
+            select(Course).join(CourseEnrollment).where(CourseEnrollment.user_id == current_user.id).order_by(Course.id)
+        )
+    ).all()
+    return [await build_course_list_item(session, course, current_user) for course in courses]
+
+
 @router.post("", response_model=CourseListItem, status_code=status.HTTP_201_CREATED)
 async def create_course(
     payload: CourseMutation,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> CourseListItem:
-    course = Course(**payload.model_dump(), owner_id=current_user.id)
+    data = payload.model_dump()
+    data["description_html"] = sanitize_course_html(data.get("description_html") or data["description"])
+    data["learning_goals"] = [goal.strip() for goal in data.get("learning_goals", []) if goal.strip()]
+    course = Course(**data, owner_id=current_user.id)
     session.add(course)
     await session.commit()
     await session.refresh(course)
+    return await build_course_list_item(session, course, current_user)
+
+
+@router.post("/{course_id}/enroll", response_model=CourseListItem)
+async def enroll_course(
+    course_id: int,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> CourseListItem:
+    course = await get_course_or_404(session, course_id)
+    existing = await session.scalar(
+        select(CourseEnrollment).where(CourseEnrollment.course_id == course_id, CourseEnrollment.user_id == current_user.id)
+    )
+    if not existing and not can_edit_course(course, current_user):
+        session.add(CourseEnrollment(course_id=course_id, user_id=current_user.id))
+        await session.commit()
     return await build_course_list_item(session, course, current_user)
 
 
@@ -190,7 +363,10 @@ async def update_course(
 ) -> CourseListItem:
     course = await get_course_or_404(session, course_id)
     require_course_editor(course, current_user)
-    for field, value in payload.model_dump().items():
+    data = payload.model_dump()
+    data["description_html"] = sanitize_course_html(data.get("description_html") or data["description"])
+    data["learning_goals"] = [goal.strip() for goal in data.get("learning_goals", []) if goal.strip()]
+    for field, value in data.items():
         setattr(course, field, value)
     await session.commit()
     await session.refresh(course)
@@ -210,6 +386,7 @@ async def delete_course(
     task_ids = select(Task.id).where(Task.lesson_id.in_(lesson_ids))
 
     await session.execute(delete(TaskResult).where(TaskResult.task_id.in_(task_ids)))
+    await session.execute(delete(CourseEnrollment).where(CourseEnrollment.course_id == course_id))
     await session.execute(delete(Certificate).where(Certificate.course_id == course_id))
     await session.execute(delete(Task).where(Task.lesson_id.in_(lesson_ids)))
     await session.execute(delete(Lesson).where(Lesson.course_id == course_id))
@@ -293,7 +470,7 @@ async def create_task(
         raise HTTPException(status_code=404, detail="Урок не найден")
     course = await get_course_or_404(session, lesson.course_id)
     require_course_editor(course, current_user)
-    task = Task(lesson_id=lesson_id, **payload.model_dump())
+    task = Task(lesson_id=lesson_id, **normalize_task_payload(payload))
     session.add(task)
     await session.commit()
     await session.refresh(task)
@@ -315,7 +492,7 @@ async def update_task(
         raise HTTPException(status_code=404, detail="Урок не найден")
     course = await get_course_or_404(session, course_id)
     require_course_editor(course, current_user)
-    for field, value in payload.model_dump().items():
+    for field, value in normalize_task_payload(payload).items():
         setattr(task, field, value)
     await session.commit()
     await session.refresh(task)
@@ -452,7 +629,7 @@ async def submit_task(
         raise HTTPException(status_code=404, detail="Задание не найдено")
 
     await assert_task_is_unlocked(session, task_id, current_user)
-    is_correct = normalize_answer(payload.answer) == normalize_answer(task.correct_answer)
+    is_correct = answer_is_correct(task, payload.answer)
     result = await session.scalar(
         select(TaskResult).where(TaskResult.task_id == task.id, TaskResult.user_id == current_user.id)
     )

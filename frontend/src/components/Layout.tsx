@@ -1,4 +1,4 @@
-import { BookOpenCheck, LogOut, Medal, PencilRuler, ShieldCheck } from "lucide-react";
+import { BookOpenCheck, LogOut, Medal, PencilRuler, ShieldCheck, UserRound } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth";
@@ -32,8 +32,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
               Панель администратора
             </Link>
           )}
+          <Link className="topbar-link" to="/profile">
+            <UserRound size={16} />
+            Профиль
+          </Link>
           <span className="user-chip">
-            <Medal size={16} />
+            {user?.avatar_url ? <img className="user-chip-avatar" src={user.avatar_url} alt="" /> : <Medal size={16} />}
             {user?.full_name}
           </span>
           <button className="icon-button" type="button" onClick={handleLogout} title="Выйти">

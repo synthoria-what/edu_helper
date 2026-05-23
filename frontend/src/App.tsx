@@ -7,6 +7,8 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
 import { AdminPage } from "./pages/AdminPage";
 import { TeacherPage } from "./pages/TeacherPage";
+import { CourseLearnPage } from "./pages/CourseLearnPage";
+import { ProfilePage } from "./pages/ProfilePage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -52,10 +54,26 @@ export function App() {
         }
       />
       <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <ProfilePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/courses/:courseId"
         element={
           <ProtectedRoute>
             <CoursePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/courses/:courseId/learn"
+        element={
+          <ProtectedRoute>
+            <CourseLearnPage />
           </ProtectedRoute>
         }
       />

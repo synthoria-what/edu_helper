@@ -16,3 +16,6 @@ frontend/.vite/
 .idea/
 .vscode/
 *.log
+.agents
+.codex
+

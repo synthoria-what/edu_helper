@@ -152,6 +152,18 @@ export const api = {
   async me(): Promise<User> {
     return request<User>("/auth/me");
   },
+  async updateMe(payload: { full_name: string; email: string; avatar_url?: string | null }): Promise<User> {
+    return request<User>("/auth/me", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+  async updateMyPassword(currentPassword: string, newPassword: string): Promise<User> {
+    return request<User>("/auth/me/password", {
+      method: "PUT",
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    });
+  },
   async users(): Promise<AdminUser[]> {
     return request<AdminUser[]>("/auth/users");
   },
@@ -161,14 +173,31 @@ export const api = {
       body: JSON.stringify({ role }),
     });
   },
-  async courses(): Promise<CourseListItem[]> {
-    return request<CourseListItem[]>("/courses");
+  async updateUserPassword(userId: string, password: string): Promise<User> {
+    return request<User>(`/auth/users/${userId}/password`, {
+      method: "PUT",
+      body: JSON.stringify({ password }),
+    });
+  },
+  async courses(filters: { q?: string; price?: string; direction?: string; level?: string; owner_id?: string } = {}): Promise<CourseListItem[]> {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+    });
+    const query = params.toString();
+    return request<CourseListItem[]>(`/courses${query ? `?${query}` : ""}`);
   },
   async myCourses(): Promise<CourseListItem[]> {
     return request<CourseListItem[]>("/courses/mine");
   },
+  async enrolledCourses(): Promise<CourseListItem[]> {
+    return request<CourseListItem[]>("/courses/enrolled");
+  },
   async course(id: string): Promise<CourseDetail> {
     return request<CourseDetail>(`/courses/${id}`);
+  },
+  async enrollCourse(courseId: number): Promise<CourseListItem> {
+    return request<CourseListItem>(`/courses/${courseId}/enroll`, { method: "POST" });
   },
   async progress(): Promise<ProgressSummary> {
     return request<ProgressSummary>("/progress/summary");

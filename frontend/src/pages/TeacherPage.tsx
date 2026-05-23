@@ -1,8 +1,10 @@
 import {
   BarChart3,
+  Bold,
   BookPlus,
   CheckCircle2,
   Image,
+  Italic,
   Lightbulb,
   ListChecks,
   Pencil,
@@ -13,6 +15,7 @@ import {
   UsersRound,
   Video,
   X,
+  Underline,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
@@ -41,6 +44,8 @@ type ManagerPanel = "lessons" | "tasks" | "progress";
 const emptyCourse: CourseMutation = {
   title: "",
   description: "",
+  description_html: "",
+  learning_goals: [],
   direction: "Общие компетенции",
   level: "Базовый",
   duration_minutes: 45,
@@ -115,6 +120,8 @@ export function TeacherPage() {
       setCourseForm({
         title: courseDetail.title,
         description: courseDetail.description,
+        description_html: courseDetail.description_html,
+        learning_goals: courseDetail.learning_goals,
         direction: courseDetail.direction,
         level: courseDetail.level,
         duration_minutes: courseDetail.duration_minutes,
@@ -137,6 +144,8 @@ export function TeacherPage() {
     setCourseForm({
       title: detail.title,
       description: detail.description,
+      description_html: detail.description_html,
+      learning_goals: detail.learning_goals,
       direction: detail.direction,
       level: detail.level,
       duration_minutes: detail.duration_minutes,
@@ -449,9 +458,25 @@ export function TeacherPage() {
               <p className="helper-text">Заполните базовую карточку курса. Уроки и задания появятся отдельными шагами после сохранения.</p>
               <Field label="Название" value={courseForm.title} onChange={(value) => setCourseForm({ ...courseForm, title: value })} />
               <Textarea
-                label="Описание"
+                label="Краткое описание"
                 value={courseForm.description}
                 onChange={(value) => setCourseForm({ ...courseForm, description: value })}
+              />
+              <RichTextEditor
+                label="Подробное описание"
+                value={courseForm.description_html}
+                onChange={(value) => setCourseForm({ ...courseForm, description_html: value })}
+                onError={notify}
+              />
+              <Textarea
+                label="Чему научится ученик"
+                value={courseForm.learning_goals.join("\n")}
+                onChange={(value) =>
+                  setCourseForm({
+                    ...courseForm,
+                    learning_goals: value.split("\n").map((item) => item.trim()).filter(Boolean),
+                  })
+                }
               />
               <div className="form-row">
                 <Field
@@ -770,6 +795,24 @@ export function TeacherPage() {
                 label="Ребус"
                 onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "rebus"))}
               />
+              <TaskTypeButton
+                active={taskForm.type === "multi_choice"}
+                description="Можно выбрать несколько вариантов"
+                label="Несколько ответов"
+                onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "multi_choice"))}
+              />
+              <TaskTypeButton
+                active={taskForm.type === "text_input"}
+                description="Короткий ручной ответ"
+                label="Текст"
+                onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "text_input"))}
+              />
+              <TaskTypeButton
+                active={taskForm.type === "order"}
+                description="Последовательность элементов"
+                label="Порядок"
+                onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "order"))}
+              />
             </div>
 
             <div className="builder-step">
@@ -840,6 +883,39 @@ function defaultTaskForm(orderIndex = 1, type: TaskType = "quiz"): TaskMutation 
       order_index: orderIndex,
     };
   }
+  if (type === "multi_choice") {
+    return {
+      type,
+      title: "Несколько правильных ответов",
+      prompt: "Выбери все подходящие варианты.",
+      payload: { options: ["Вариант 1", "Вариант 2", "Вариант 3"], correct_answers: ["Вариант 1", "Вариант 2"] },
+      correct_answer: "Вариант 1|Вариант 2",
+      image_url: "",
+      order_index: orderIndex,
+    };
+  }
+  if (type === "text_input") {
+    return {
+      type,
+      title: "Короткий ответ",
+      prompt: "Введи правильный ответ.",
+      payload: {},
+      correct_answer: "Ответ",
+      image_url: "",
+      order_index: orderIndex,
+    };
+  }
+  if (type === "order") {
+    return {
+      type,
+      title: "Расставь по порядку",
+      prompt: "Перемести элементы в правильной последовательности.",
+      payload: { items: ["Первый шаг", "Второй шаг", "Третий шаг"] },
+      correct_answer: "Первый шаг|Второй шаг|Третий шаг",
+      image_url: "",
+      order_index: orderIndex,
+    };
+  }
   return {
     type,
     title: "Квиз",
@@ -852,7 +928,16 @@ function defaultTaskForm(orderIndex = 1, type: TaskType = "quiz"): TaskMutation 
 }
 
 function normalizeCourse(payload: CourseMutation): CourseMutation {
-  return { ...payload, image_url: payload.image_url?.trim() || null };
+  return {
+    ...payload,
+    description_html: payload.description_html?.trim() || `<p>${escapeHtml(payload.description)}</p>`,
+    learning_goals: payload.learning_goals.map((goal) => goal.trim()).filter(Boolean),
+    image_url: payload.image_url?.trim() || null,
+  };
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function normalizeLesson(payload: LessonMutation): LessonMutation {
@@ -864,6 +949,23 @@ function normalizeLesson(payload: LessonMutation): LessonMutation {
 }
 
 function normalizeTask(payload: TaskMutation): TaskMutation {
+  if (payload.type === "multi_choice") {
+    const correctAnswers = Array.isArray(payload.payload.correct_answers)
+      ? payload.payload.correct_answers.map(String).filter(Boolean)
+      : payload.correct_answer.split("|").filter(Boolean);
+    return {
+      ...payload,
+      payload: { ...payload.payload, correct_answers: correctAnswers },
+      correct_answer: correctAnswers.join("|"),
+      image_url: payload.image_url?.trim() || null,
+    };
+  }
+  if (payload.type === "order") {
+    const items = Array.isArray(payload.payload.items)
+      ? payload.payload.items.map(String).filter(Boolean)
+      : payload.correct_answer.split("|").filter(Boolean);
+    return { ...payload, payload: { ...payload.payload, items }, correct_answer: items.join("|"), image_url: payload.image_url?.trim() || null };
+  }
   return { ...payload, image_url: payload.image_url?.trim() || null };
 }
 
@@ -873,6 +975,14 @@ function getOptions(taskForm: TaskMutation): string[] {
 
 function getPoints(taskForm: TaskMutation): ChartPoint[] {
   return Array.isArray(taskForm.payload.points) ? (taskForm.payload.points as ChartPoint[]) : [];
+}
+
+function getCorrectAnswers(taskForm: TaskMutation): string[] {
+  return Array.isArray(taskForm.payload.correct_answers) ? taskForm.payload.correct_answers.map(String) : taskForm.correct_answer.split("|").filter(Boolean);
+}
+
+function getOrderItems(taskForm: TaskMutation): string[] {
+  return Array.isArray(taskForm.payload.items) ? taskForm.payload.items.map(String) : [];
 }
 
 function SummaryBox({ icon, label, value }: { icon: React.ReactNode; label: string; value: number | string }) {
@@ -960,6 +1070,72 @@ function Textarea({ label, value, onChange }: { label: string; value: string; on
     <label>
       {label}
       <textarea value={value} onChange={(event) => onChange(event.target.value)} required />
+    </label>
+  );
+}
+
+function RichTextEditor({
+  label,
+  value,
+  onChange,
+  onError,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  onError: (message: string) => void;
+}) {
+  const editorRef = useMemo(() => ({ current: null as HTMLDivElement | null }), []);
+
+  function command(name: string, commandValue?: string) {
+    document.execCommand(name, false, commandValue);
+    onChange(editorRef.current?.innerHTML ?? "");
+  }
+
+  async function insertImage(file: File | undefined) {
+    if (!file) return;
+    try {
+      const uploaded = await api.uploadImage(file);
+      command("insertImage", uploaded.url);
+    } catch (error) {
+      onError(error instanceof Error ? error.message : "Не удалось вставить картинку");
+    }
+  }
+
+  return (
+    <label className="rich-editor-field">
+      {label}
+      <div className="rich-editor-toolbar">
+        <button type="button" className="icon-button" onClick={() => command("bold")} title="Полужирный"><Bold size={16} /></button>
+        <button type="button" className="icon-button" onClick={() => command("italic")} title="Курсив"><Italic size={16} /></button>
+        <button type="button" className="icon-button" onClick={() => command("underline")} title="Подчеркнутый"><Underline size={16} /></button>
+        <select onChange={(event) => command("fontSize", event.target.value)} defaultValue="3" title="Размер">
+          <option value="2">Мелкий</option>
+          <option value="3">Обычный</option>
+          <option value="5">Крупный</option>
+        </select>
+        <label className="file-picker compact" title="Вставить картинку">
+          <Image size={18} />
+          <input
+            aria-label="Вставить картинку"
+            accept="image/gif,image/jpeg,image/png,image/webp"
+            type="file"
+            onChange={(event) => {
+              void insertImage(event.target.files?.[0]);
+              event.target.value = "";
+            }}
+          />
+        </label>
+      </div>
+      <div
+        className="rich-editor"
+        contentEditable
+        dangerouslySetInnerHTML={{ __html: value }}
+        onBlur={(event) => onChange(event.currentTarget.innerHTML)}
+        ref={(node) => {
+          editorRef.current = node;
+        }}
+      />
     </label>
   );
 }
@@ -1319,10 +1495,70 @@ function TaskPayloadFields({
     );
   }
 
+  if (taskForm.type === "text_input") {
+    return (
+      <div className="specific-fields">
+        <p className="helper-text">Ученик вводит короткий текст, ответ сравнивается без учета регистра.</p>
+        <Field
+          label="Правильный ответ"
+          value={taskForm.correct_answer}
+          onChange={(value) => setTaskForm({ ...taskForm, correct_answer: value })}
+        />
+      </div>
+    );
+  }
+
+  if (taskForm.type === "order") {
+    const items = getOrderItems(taskForm);
+    return (
+      <div className="specific-fields">
+        <p className="helper-text">Порядок строк ниже считается правильным ответом.</p>
+        {items.map((item, index) => (
+          <div className="option-editor-row" key={`order-item-${index}`}>
+            <input
+              value={item}
+              onChange={(event) => {
+                const nextItems = items.map((value, itemIndex) => (itemIndex === index ? event.target.value : value));
+                setTaskForm({ ...taskForm, payload: { items: nextItems }, correct_answer: nextItems.join("|") });
+              }}
+              placeholder={`Шаг ${index + 1}`}
+              required
+            />
+            <button
+              className="icon-button"
+              type="button"
+              onClick={() => {
+                const nextItems = items.filter((_, itemIndex) => itemIndex !== index);
+                setTaskForm({ ...taskForm, payload: { items: nextItems }, correct_answer: nextItems.join("|") });
+              }}
+              title="Удалить"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        ))}
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={() => {
+            const nextItems = [...items, `Шаг ${items.length + 1}`];
+            setTaskForm({ ...taskForm, payload: { items: nextItems }, correct_answer: nextItems.join("|") });
+          }}
+        >
+          <Plus size={18} />
+          Добавить шаг
+        </button>
+      </div>
+    );
+  }
+
   const options = getOptions(taskForm);
+  const correctAnswers = getCorrectAnswers(taskForm);
   return (
     <div className="specific-fields">
-      <p className="helper-text">Варианты станут кнопками. Правильный ответ выбирается из списка ниже.</p>
+      <p className="helper-text">
+        {taskForm.type === "multi_choice" ? "Отметьте все правильные варианты." : "Варианты станут кнопками. Правильный ответ выбирается из списка ниже."}
+      </p>
       {options.map((option, index) => (
         <div className="option-editor-row" key={`quiz-option-${index}`}>
           <input
@@ -1370,17 +1606,41 @@ function TaskPayloadFields({
       </button>
       <label>
         Правильный ответ
-        <select
-          value={taskForm.correct_answer}
-          onChange={(event) => setTaskForm({ ...taskForm, correct_answer: event.target.value })}
-          required
-        >
-          {options.map((option, index) => (
-            <option key={`${option}-${index}`} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
+        {taskForm.type === "multi_choice" ? (
+          <div className="checkbox-list">
+            {options.map((option, index) => (
+              <label key={`${option}-${index}`}>
+                <input
+                  checked={correctAnswers.includes(option)}
+                  type="checkbox"
+                  onChange={(event) => {
+                    const nextAnswers = event.target.checked
+                      ? [...correctAnswers, option]
+                      : correctAnswers.filter((item) => item !== option);
+                    setTaskForm({
+                      ...taskForm,
+                      payload: { ...taskForm.payload, correct_answers: nextAnswers },
+                      correct_answer: nextAnswers.join("|"),
+                    });
+                  }}
+                />
+                {option}
+              </label>
+            ))}
+          </div>
+        ) : (
+          <select
+            value={taskForm.correct_answer}
+            onChange={(event) => setTaskForm({ ...taskForm, correct_answer: event.target.value })}
+            required
+          >
+            {options.map((option, index) => (
+              <option key={`${option}-${index}`} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        )}
       </label>
     </div>
   );
@@ -1394,7 +1654,7 @@ function TaskPreview({ taskForm }: { taskForm: TaskMutation }) {
       <span>Предпросмотр</span>
       <strong>{taskForm.title || "Название задания"}</strong>
       <p>{taskForm.prompt || "Вопрос для ученика"}</p>
-      {taskForm.type === "quiz" && (
+      {(taskForm.type === "quiz" || taskForm.type === "multi_choice") && (
         <div className="preview-options">
           {options.map((option, index) => (
             <button key={`preview-option-${index}`} type="button">
@@ -1417,6 +1677,14 @@ function TaskPreview({ taskForm }: { taskForm: TaskMutation }) {
         <div className="preview-rebus">
           <strong>{String(taskForm.payload.clue ?? "")}</strong>
           <small>{String(taskForm.payload.hint ?? "")}</small>
+        </div>
+      )}
+      {taskForm.type === "text_input" && <div className="preview-rebus"><small>Поле короткого ответа</small></div>}
+      {taskForm.type === "order" && (
+        <div className="preview-options">
+          {getOrderItems(taskForm).map((item, index) => (
+            <button key={`preview-order-${index}`} type="button">{index + 1}. {item}</button>
+          ))}
         </div>
       )}
     </div>
