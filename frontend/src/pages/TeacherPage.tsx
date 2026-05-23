@@ -12,6 +12,7 @@ import {
   Upload,
   UsersRound,
   Video,
+  X,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
@@ -605,49 +606,6 @@ export function TeacherPage() {
                       </div>
                     )}
                   </div>
-
-                  {isLessonFormOpen && (
-                    <form className="teacher-form separated-form" onSubmit={saveLesson}>
-                      <h3>{editingLessonId ? "Редактировать урок" : "Добавить урок"}</h3>
-                      <p className="helper-text">YouTube и Rutube можно вставлять обычной ссылкой. При сохранении она станет ссылкой для встраивания.</p>
-                      <Field label="Название урока" value={lessonForm.title} onChange={(value) => setLessonForm({ ...lessonForm, title: value })} />
-                      <Textarea
-                        label="Описание и теория"
-                        value={lessonForm.content}
-                        onChange={(value) => setLessonForm({ ...lessonForm, content: value })}
-                      />
-                      <div className="form-row">
-                        <Field
-                          label="Видео-ссылка"
-                          value={lessonForm.video_url ?? ""}
-                          onChange={(value) => setLessonForm({ ...lessonForm, video_url: value })}
-                          icon={<Video size={16} />}
-                          required={false}
-                        />
-                        <ImageUrlUploadField
-                          label="Картинка урока"
-                          imageUrl={lessonForm.image_url ?? ""}
-                          onChange={(value) => setLessonForm({ ...lessonForm, image_url: value })}
-                          onError={notify}
-                        />
-                      </div>
-                      <Field
-                        label="Порядок"
-                        type="number"
-                        value={String(lessonForm.order_index)}
-                        onChange={(value) => setLessonForm({ ...lessonForm, order_index: Number(value) })}
-                      />
-                      <div className="form-actions">
-                        <button className="primary-button" type="submit">
-                          <BookPlus size={18} />
-                          {editingLessonId ? "Сохранить урок" : "Добавить урок"}
-                        </button>
-                        <button className="secondary-button" type="button" onClick={cancelLessonEdit}>
-                          Отмена
-                        </button>
-                      </div>
-                    </form>
-                  )}
                 </div>
               )}
 
@@ -712,76 +670,6 @@ export function TeacherPage() {
                       )}
                     </div>
                   )}
-
-                  {isTaskFormOpen && (
-                    <form className="teacher-form separated-form" onSubmit={saveTask}>
-                      <h3>{editingTaskId ? "Редактировать задание" : "Добавить задание"}</h3>
-
-                      <div className="builder-step">
-                        <span>1</span>
-                        <strong>Тип задания</strong>
-                      </div>
-                      <div className="task-type-grid">
-                        <TaskTypeButton
-                          active={taskForm.type === "quiz"}
-                          description="Вопрос и несколько вариантов"
-                          label="Квиз"
-                          onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "quiz"))}
-                        />
-                        <TaskTypeButton
-                          active={taskForm.type === "chart"}
-                          description="График, ответ кликом"
-                          label="График"
-                          onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "chart"))}
-                        />
-                        <TaskTypeButton
-                          active={taskForm.type === "rebus"}
-                          description="Ребус и текстовый ответ"
-                          label="Ребус"
-                          onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "rebus"))}
-                        />
-                      </div>
-
-                      <div className="builder-step">
-                        <span>2</span>
-                        <strong>Содержание</strong>
-                      </div>
-                      <Field label="Название" value={taskForm.title} onChange={(value) => setTaskForm({ ...taskForm, title: value })} />
-                      <Textarea label="Вопрос для ученика" value={taskForm.prompt} onChange={(value) => setTaskForm({ ...taskForm, prompt: value })} />
-                      <TaskPayloadFields taskForm={taskForm} setTaskForm={setTaskForm} />
-
-                      <div className="builder-step">
-                        <span>3</span>
-                        <strong>Дополнительно</strong>
-                      </div>
-                      <div className="form-row">
-                        <ImageUrlUploadField
-                          label="Картинка задания"
-                          imageUrl={taskForm.image_url ?? ""}
-                          onChange={(value) => setTaskForm({ ...taskForm, image_url: value })}
-                          onError={notify}
-                        />
-                        <Field
-                          label="Порядок"
-                          type="number"
-                          value={String(taskForm.order_index)}
-                          onChange={(value) => setTaskForm({ ...taskForm, order_index: Number(value) })}
-                        />
-                      </div>
-
-                      <TaskPreview taskForm={taskForm} />
-
-                      <div className="form-actions">
-                        <button className="primary-button" type="submit" disabled={!selectedLessonId}>
-                          <ListChecks size={18} />
-                          {editingTaskId ? "Сохранить задание" : "Добавить задание"}
-                        </button>
-                        <button className="secondary-button" type="button" onClick={closeTaskForm}>
-                        Отмена
-                      </button>
-                      </div>
-                    </form>
-                  )}
                 </div>
               )}
 
@@ -811,6 +699,120 @@ export function TeacherPage() {
           )}
         </div>
       </section>
+
+      {isLessonFormOpen && (
+        <EditorModal title={editingLessonId ? "Редактировать урок" : "Добавить урок"} onClose={cancelLessonEdit}>
+          <form className="teacher-form editor-modal-form" onSubmit={saveLesson}>
+            <p className="helper-text">YouTube и Rutube можно вставлять обычной ссылкой. При сохранении она станет ссылкой для встраивания.</p>
+            <Field label="Название урока" value={lessonForm.title} onChange={(value) => setLessonForm({ ...lessonForm, title: value })} />
+            <Textarea
+              label="Описание и теория"
+              value={lessonForm.content}
+              onChange={(value) => setLessonForm({ ...lessonForm, content: value })}
+            />
+            <div className="form-row">
+              <Field
+                label="Видео-ссылка"
+                value={lessonForm.video_url ?? ""}
+                onChange={(value) => setLessonForm({ ...lessonForm, video_url: value })}
+                icon={<Video size={16} />}
+                required={false}
+              />
+              <ImageUrlUploadField
+                label="Картинка урока"
+                imageUrl={lessonForm.image_url ?? ""}
+                onChange={(value) => setLessonForm({ ...lessonForm, image_url: value })}
+                onError={notify}
+              />
+            </div>
+            <Field
+              label="Порядок"
+              type="number"
+              value={String(lessonForm.order_index)}
+              onChange={(value) => setLessonForm({ ...lessonForm, order_index: Number(value) })}
+            />
+            <div className="form-actions">
+              <button className="primary-button" type="submit">
+                <BookPlus size={18} />
+                {editingLessonId ? "Сохранить урок" : "Добавить урок"}
+              </button>
+              <button className="secondary-button" type="button" onClick={cancelLessonEdit}>
+                Отмена
+              </button>
+            </div>
+          </form>
+        </EditorModal>
+      )}
+
+      {isTaskFormOpen && (
+        <EditorModal title={editingTaskId ? "Редактировать задание" : "Добавить задание"} onClose={closeTaskForm}>
+          <form className="teacher-form editor-modal-form" onSubmit={saveTask}>
+            <div className="builder-step">
+              <span>1</span>
+              <strong>Тип задания</strong>
+            </div>
+            <div className="task-type-grid">
+              <TaskTypeButton
+                active={taskForm.type === "quiz"}
+                description="Вопрос и несколько вариантов"
+                label="Квиз"
+                onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "quiz"))}
+              />
+              <TaskTypeButton
+                active={taskForm.type === "chart"}
+                description="График, ответ кликом"
+                label="График"
+                onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "chart"))}
+              />
+              <TaskTypeButton
+                active={taskForm.type === "rebus"}
+                description="Ребус и текстовый ответ"
+                label="Ребус"
+                onClick={() => setTaskForm(defaultTaskForm(taskForm.order_index, "rebus"))}
+              />
+            </div>
+
+            <div className="builder-step">
+              <span>2</span>
+              <strong>Содержание</strong>
+            </div>
+            <Field label="Название" value={taskForm.title} onChange={(value) => setTaskForm({ ...taskForm, title: value })} />
+            <Textarea label="Вопрос для ученика" value={taskForm.prompt} onChange={(value) => setTaskForm({ ...taskForm, prompt: value })} />
+            <TaskPayloadFields taskForm={taskForm} setTaskForm={setTaskForm} />
+
+            <div className="builder-step">
+              <span>3</span>
+              <strong>Дополнительно</strong>
+            </div>
+            <div className="form-row">
+              <ImageUrlUploadField
+                label="Картинка задания"
+                imageUrl={taskForm.image_url ?? ""}
+                onChange={(value) => setTaskForm({ ...taskForm, image_url: value })}
+                onError={notify}
+              />
+              <Field
+                label="Порядок"
+                type="number"
+                value={String(taskForm.order_index)}
+                onChange={(value) => setTaskForm({ ...taskForm, order_index: Number(value) })}
+              />
+            </div>
+
+            <TaskPreview taskForm={taskForm} />
+
+            <div className="form-actions">
+              <button className="primary-button" type="submit" disabled={!selectedLessonId}>
+                <ListChecks size={18} />
+                {editingTaskId ? "Сохранить задание" : "Добавить задание"}
+              </button>
+              <button className="secondary-button" type="button" onClick={closeTaskForm}>
+                Отмена
+              </button>
+            </div>
+          </form>
+        </EditorModal>
+      )}
     </Layout>
   );
 }
@@ -888,6 +890,22 @@ function PanelTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
     <div className="panel-title">
       {icon}
       <h2>{title}</h2>
+    </div>
+  );
+}
+
+function EditorModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="editor-modal-backdrop" role="presentation">
+      <section className="editor-modal" role="dialog" aria-modal="true" aria-label={title}>
+        <div className="editor-modal-header">
+          <h2>{title}</h2>
+          <button className="icon-button" type="button" onClick={onClose} title="Закрыть">
+            <X size={18} />
+          </button>
+        </div>
+        {children}
+      </section>
     </div>
   );
 }
