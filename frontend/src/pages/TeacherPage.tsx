@@ -976,13 +976,49 @@ function ImageUrlUploadField({
   onError: (message: string) => void;
 }) {
   const [isUploading, setIsUploading] = useState(false);
+  const [editingImage, setEditingImage] = useState<{ file: File; url: string } | null>(null);
 
-  async function uploadSelectedFile(file: File | undefined) {
+  function editSelectedFile(file: File | undefined) {
     if (!file) return;
+    if (editingImage) {
+      URL.revokeObjectURL(editingImage.url);
+    }
+    setEditingImage({ file, url: URL.createObjectURL(file) });
+  }
+
+  async function editCurrentImage() {
+    if (!imageUrl) return;
+    try {
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error("Не удалось открыть картинку");
+      }
+      const blob = await response.blob();
+      const file = new File([blob], "image.jpg", { type: blob.type || "image/jpeg" });
+      if (editingImage) {
+        URL.revokeObjectURL(editingImage.url);
+      }
+      setEditingImage({ file, url: URL.createObjectURL(file) });
+    } catch {
+      onError("Не удалось открыть картинку для редактирования. Загрузите файл заново");
+    }
+  }
+
+  function closeEditor() {
+    if (editingImage) {
+      URL.revokeObjectURL(editingImage.url);
+    }
+    setEditingImage(null);
+  }
+
+  async function uploadEditedImage(settings: PhotoEditSettings) {
+    if (!editingImage) return;
     setIsUploading(true);
     try {
+      const file = await createEditedImageFile(editingImage.file, editingImage.url, settings);
       const uploaded = await api.uploadImage(file);
       onChange(uploaded.url);
+      closeEditor();
     } catch (error) {
       onError(error instanceof Error ? error.message : "Не удалось загрузить картинку");
     } finally {
@@ -1005,20 +1041,155 @@ function ImageUrlUploadField({
             accept="image/gif,image/jpeg,image/png,image/webp"
             disabled={isUploading}
             type="file"
-            onChange={(event) => void uploadSelectedFile(event.target.files?.[0])}
+            onChange={(event) => {
+              editSelectedFile(event.target.files?.[0]);
+              event.target.value = "";
+            }}
           />
         </label>
       </div>
       {imageUrl && (
         <div className="upload-preview">
           <img src={imageUrl} alt="" />
+          <button className="secondary-button" type="button" onClick={() => void editCurrentImage()}>
+            Править
+          </button>
           <button className="secondary-button" type="button" onClick={() => onChange("")}>
             Убрать
           </button>
         </div>
       )}
+      {editingImage && (
+        <PhotoEditorModal
+          imageUrl={editingImage.url}
+          isSaving={isUploading}
+          onCancel={closeEditor}
+          onSave={(settings) => void uploadEditedImage(settings)}
+        />
+      )}
     </div>
   );
+}
+
+type PhotoEditSettings = {
+  offsetX: number;
+  offsetY: number;
+  zoom: number;
+};
+
+function PhotoEditorModal({
+  imageUrl,
+  isSaving,
+  onCancel,
+  onSave,
+}: {
+  imageUrl: string;
+  isSaving: boolean;
+  onCancel: () => void;
+  onSave: (settings: PhotoEditSettings) => void;
+}) {
+  const [settings, setSettings] = useState<PhotoEditSettings>({ offsetX: 0, offsetY: 0, zoom: 1 });
+
+  return (
+    <EditorModal title="Редактор картинки" onClose={onCancel}>
+      <div className="photo-editor">
+        <div className="photo-editor-frame">
+          <img
+            src={imageUrl}
+            alt=""
+            style={{
+              transform: `translate(-50%, -50%) translate(${settings.offsetX}%, ${settings.offsetY}%) scale(${settings.zoom})`,
+            }}
+          />
+        </div>
+        <div className="photo-editor-controls">
+          <label>
+            Масштаб
+            <input
+              max="2.4"
+              min="1"
+              step="0.05"
+              type="range"
+              value={settings.zoom}
+              onChange={(event) => setSettings({ ...settings, zoom: Number(event.target.value) })}
+            />
+          </label>
+          <label>
+            По горизонтали
+            <input
+              max="45"
+              min="-45"
+              step="1"
+              type="range"
+              value={settings.offsetX}
+              onChange={(event) => setSettings({ ...settings, offsetX: Number(event.target.value) })}
+            />
+          </label>
+          <label>
+            По вертикали
+            <input
+              max="45"
+              min="-45"
+              step="1"
+              type="range"
+              value={settings.offsetY}
+              onChange={(event) => setSettings({ ...settings, offsetY: Number(event.target.value) })}
+            />
+          </label>
+        </div>
+        <div className="form-actions">
+          <button className="primary-button" type="button" onClick={() => onSave(settings)} disabled={isSaving}>
+            <Save size={18} />
+            {isSaving ? "Сохраняем..." : "Сохранить картинку"}
+          </button>
+          <button className="secondary-button" type="button" onClick={onCancel}>
+            Отмена
+          </button>
+        </div>
+      </div>
+    </EditorModal>
+  );
+}
+
+async function createEditedImageFile(file: File, imageUrl: string, settings: PhotoEditSettings): Promise<File> {
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  const image = document.createElement("img");
+
+  canvas.width = 1600;
+  canvas.height = 900;
+
+  if (!context) {
+    return file;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("Не удалось обработать картинку"));
+    image.src = imageUrl;
+  });
+
+  context.fillStyle = "#f8fffc";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  const imageRatio = image.naturalWidth / image.naturalHeight;
+  const canvasRatio = canvas.width / canvas.height;
+  const baseScale = imageRatio > canvasRatio ? canvas.height / image.naturalHeight : canvas.width / image.naturalWidth;
+  const scale = baseScale * settings.zoom;
+  const width = image.naturalWidth * scale;
+  const height = image.naturalHeight * scale;
+  const x = (canvas.width - width) / 2 + (settings.offsetX / 100) * canvas.width;
+  const y = (canvas.height - height) / 2 + (settings.offsetY / 100) * canvas.height;
+  context.drawImage(image, x, y, width, height);
+
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+  const binary = atob(dataUrl.split(",")[1]);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return new File([bytes], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
 }
 
 function TaskPayloadFields({
