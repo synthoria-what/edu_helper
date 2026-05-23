@@ -1286,6 +1286,13 @@ select {
   min-width: 0;
 }
 
+.task-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .task-editor-item span {
   color: #d08a28;
   font-size: 12px;

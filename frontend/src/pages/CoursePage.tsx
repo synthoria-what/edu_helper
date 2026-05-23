@@ -115,27 +115,35 @@ export function CoursePage() {
                 <h2>Модули курса</h2>
               </div>
               <div className="student-module-list">
-                {orderedLessons.map((lesson) => {
-                  const completedTasks = lesson.tasks.filter((task) => task.result?.is_correct).length;
-                  return (
-                    <button
-                      className={lesson.id === selectedLesson?.id ? "student-module-card active" : "student-module-card"}
-                      key={lesson.id}
-                      type="button"
-                      onClick={() => setSelectedLessonId(lesson.id)}
-                    >
-                      <span>Модуль {lesson.order_index}</span>
-                      <strong>{lesson.title}</strong>
-                      <small>
-                        {completedTasks}/{formatTaskCount(lesson.tasks.length)}
-                      </small>
-                    </button>
-                  );
-                })}
+                {orderedLessons.length ? (
+                  orderedLessons.map((lesson) => {
+                    const completedTasks = lesson.tasks.filter((task) => task.result?.is_correct).length;
+                    return (
+                      <button
+                        className={lesson.id === selectedLesson?.id ? "student-module-card active" : "student-module-card"}
+                        key={lesson.id}
+                        type="button"
+                        onClick={() => setSelectedLessonId(lesson.id)}
+                      >
+                        <span>Модуль {lesson.order_index}</span>
+                        <strong>{lesson.title}</strong>
+                        <small>
+                          {completedTasks}/{formatTaskCount(lesson.tasks.length)}
+                        </small>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="empty-state compact">
+                    <BookOpen size={24} />
+                    <strong>Модулей пока нет</strong>
+                    <span>Преподаватель еще не добавил уроки в этот курс.</span>
+                  </div>
+                )}
               </div>
             </aside>
 
-            {selectedLesson && (
+            {selectedLesson ? (
               <section className="student-module-detail">
                 <div className={selectedLesson.image_url || selectedLesson.video_url ? "student-module-overview has-media" : "student-module-overview"}>
                   <div className="student-module-copy">
@@ -202,6 +210,14 @@ export function CoursePage() {
                       </div>
                     )}
                   </div>
+                </div>
+              </section>
+            ) : (
+              <section className="student-module-detail">
+                <div className="student-module-copy">
+                  <span>Курс в подготовке</span>
+                  <h2>Материалы еще не добавлены</h2>
+                  <p>Как только преподаватель создаст первый модуль, он появится здесь вместе с заданиями.</p>
                 </div>
               </section>
             )}

@@ -343,6 +343,52 @@ export function TeacherPage() {
     }
   }
 
+  async function deleteLesson(lessonId: number) {
+    if (!selectedCourseId) return;
+    const lesson = courseDetail?.lessons.find((item) => item.id === lessonId);
+    if (!lesson) return;
+
+    const shouldDelete = window.confirm(`Удалить урок "${lesson.title}"? Задания и прогресс по ним тоже будут удалены.`);
+    if (!shouldDelete) return;
+
+    try {
+      await api.deleteLesson(lessonId);
+      if (editingLessonId === lessonId) {
+        setEditingLessonId(null);
+        setIsLessonFormOpen(false);
+        setLessonForm({ ...emptyLesson, order_index: (courseDetail?.lessons.length ?? 1) });
+      }
+      setEditingTaskId(null);
+      setIsTaskFormOpen(false);
+      await loadCourse(selectedCourseId);
+      notify("Урок удален");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Не удалось удалить урок");
+    }
+  }
+
+  async function deleteTask(taskId: number) {
+    if (!selectedCourseId) return;
+    const task = courseDetail?.lessons.flatMap((lesson) => lesson.tasks).find((item) => item.id === taskId);
+    if (!task) return;
+
+    const shouldDelete = window.confirm(`Удалить задание "${task.title}"? Прогресс студентов по нему тоже будет удален.`);
+    if (!shouldDelete) return;
+
+    try {
+      await api.deleteTask(taskId);
+      if (editingTaskId === taskId) {
+        setEditingTaskId(null);
+        setIsTaskFormOpen(false);
+        setTaskForm(defaultTaskForm(getNextTaskOrder(), taskForm.type));
+      }
+      await loadCourse(selectedCourseId);
+      notify("Задание удалено");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Не удалось удалить задание");
+    }
+  }
+
   return (
     <Layout>
       <section className="dashboard-hero">
@@ -544,6 +590,10 @@ export function TeacherPage() {
                               <Plus size={18} />
                               Добавить задание
                             </button>
+                            <button className="danger-button" type="button" onClick={() => deleteLesson(lesson.id)}>
+                              <Trash2 size={18} />
+                              Удалить
+                            </button>
                           </div>
                         </div>
                       ))
@@ -641,10 +691,16 @@ export function TeacherPage() {
                                 <span>{task.order_index}. {task.type}</span>
                                 <strong>{task.title}</strong>
                               </div>
-                              <button className="secondary-button" type="button" onClick={() => editTask(selectedLessonId, task)}>
-                                <Pencil size={18} />
-                                Редактировать
-                              </button>
+                              <div className="task-editor-actions">
+                                <button className="secondary-button" type="button" onClick={() => editTask(selectedLessonId, task)}>
+                                  <Pencil size={18} />
+                                  Редактировать
+                                </button>
+                                <button className="danger-button" type="button" onClick={() => deleteTask(task.id)}>
+                                  <Trash2 size={18} />
+                                  Удалить
+                                </button>
+                              </div>
                             </div>
                           ))
                       ) : (

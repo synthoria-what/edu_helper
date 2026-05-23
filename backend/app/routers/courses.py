@@ -246,6 +246,24 @@ async def update_lesson(
     return build_lesson_read(lesson)
 
 
+@router.delete("/lessons/{lesson_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_lesson(
+    lesson_id: int,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    require_course_editor(current_user)
+    lesson = await session.scalar(select(Lesson).where(Lesson.id == lesson_id))
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Урок не найден")
+
+    task_ids = select(Task.id).where(Task.lesson_id == lesson_id)
+    await session.execute(delete(TaskResult).where(TaskResult.task_id.in_(task_ids)))
+    await session.execute(delete(Task).where(Task.lesson_id == lesson_id))
+    await session.execute(delete(Lesson).where(Lesson.id == lesson_id))
+    await session.commit()
+
+
 @router.post("/lessons/{lesson_id}/tasks", response_model=TaskRead, status_code=status.HTTP_201_CREATED)
 async def create_task(
     lesson_id: int,
@@ -280,6 +298,22 @@ async def update_task(
     await session.commit()
     await session.refresh(task)
     return build_task_read(task, include_answer=True)
+
+
+@router.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_task(
+    task_id: int,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    require_course_editor(current_user)
+    task = await session.scalar(select(Task).where(Task.id == task_id))
+    if not task:
+        raise HTTPException(status_code=404, detail="Задание не найдено")
+
+    await session.execute(delete(TaskResult).where(TaskResult.task_id == task_id))
+    await session.execute(delete(Task).where(Task.id == task_id))
+    await session.commit()
 
 
 @router.get("/{course_id}/students", response_model=list[CourseProgressStudent])

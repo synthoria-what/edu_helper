@@ -97,30 +97,38 @@ export function AdminPage() {
         </div>
 
         <div className="admin-table">
-          {visibleUsers.map((item) => {
-            const isCurrentAdmin = item.id === user?.id;
-            return (
-              <article className="admin-user-card" key={item.id}>
-                <div className="admin-user-main">
-                  <strong>{item.full_name}</strong>
-                  <span>{item.email}</span>
-                </div>
-                <div className="admin-user-meta">
-                  <span>{new Date(item.created_at).toLocaleDateString("ru-RU")}</span>
-                  <select
-                    value={item.role}
-                    onChange={(event) => void changeRole(item.id, event.target.value as UserRole)}
-                    disabled={isCurrentAdmin}
-                  >
-                    <option value="student">Студент</option>
-                    <option value="teacher">Преподаватель</option>
-                    <option value="admin">Администратор</option>
-                  </select>
-                </div>
-                {isCurrentAdmin && <small className="helper-text">Свою роль нельзя изменить из интерфейса.</small>}
-              </article>
-            );
-          })}
+          {visibleUsers.length ? (
+            visibleUsers.map((item) => {
+              const isCurrentAdmin = item.id === user?.id;
+              return (
+                <article className="admin-user-card" key={item.id}>
+                  <div className="admin-user-main">
+                    <strong>{item.full_name}</strong>
+                    <span>{item.email}</span>
+                  </div>
+                  <div className="admin-user-meta">
+                    <span>{new Date(item.created_at).toLocaleDateString("ru-RU")}</span>
+                    <select
+                      value={item.role}
+                      onChange={(event) => void changeRole(item.id, event.target.value as UserRole)}
+                      disabled={isCurrentAdmin}
+                    >
+                      <option value="student">Студент</option>
+                      <option value="teacher">Преподаватель</option>
+                      <option value="admin">Администратор</option>
+                    </select>
+                  </div>
+                  {isCurrentAdmin && <small className="helper-text">Свою роль нельзя изменить из интерфейса.</small>}
+                </article>
+              );
+            })
+          ) : (
+            <div className="empty-state">
+              <Users size={24} />
+              <strong>Пользователей не найдено</strong>
+              <span>В выбранном фильтре пока нет аккаунтов.</span>
+            </div>
+          )}
         </div>
       </section>
     </Layout>

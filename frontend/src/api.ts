@@ -203,6 +203,9 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
+  async deleteLesson(lessonId: number): Promise<void> {
+    await request<void>(`/courses/lessons/${lessonId}`, { method: "DELETE" });
+  },
   async uploadImage(file: File): Promise<{ url: string }> {
     if (file.size > MAX_UPLOAD_SIZE_MB * 1024 * 1024) {
       throw new Error(`Размер картинки не должен превышать ${MAX_UPLOAD_SIZE_MB} МБ`);
@@ -224,6 +227,9 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(payload),
     });
+  },
+  async deleteTask(taskId: number): Promise<void> {
+    await request<void>(`/courses/tasks/${taskId}`, { method: "DELETE" });
   },
   async courseStudents(courseId: number): Promise<StudentProgress[]> {
     return request<StudentProgress[]>(`/courses/${courseId}/students`);

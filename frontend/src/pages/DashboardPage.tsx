@@ -56,33 +56,41 @@ export function DashboardPage() {
           <span>{summary?.average_progress ?? 0}% общего прогресса</span>
         </div>
         <div className="course-grid">
-          {courses.map((course) => (
-            <article className="course-card" key={course.id}>
-              {course.image_url && <img className="course-card-image" src={course.image_url} alt="" />}
-              <div className="course-meta">
-                <span>{course.direction}</span>
-                <span>{course.level}</span>
-              </div>
-              <h3>{course.title}</h3>
-              <p>{course.description}</p>
-              <div className="progress-line">
-                <span style={{ width: `${course.progress_percent}%` }} />
-              </div>
-              <div className="course-footer">
-                <span>
-                  <Clock size={16} />
-                  {course.duration_minutes} мин.
-                </span>
-                <span>
-                  {course.completed_tasks}/{formatTaskCount(course.total_tasks)}
-                </span>
-              </div>
-              <Link className="secondary-button" to={`/courses/${course.id}`}>
-                Открыть
-                <ArrowRight size={18} />
-              </Link>
-            </article>
-          ))}
+          {courses.length ? (
+            courses.map((course) => (
+              <article className="course-card" key={course.id}>
+                {course.image_url && <img className="course-card-image" src={course.image_url} alt="" />}
+                <div className="course-meta">
+                  <span>{course.direction}</span>
+                  <span>{course.level}</span>
+                </div>
+                <h3>{course.title}</h3>
+                <p>{course.description}</p>
+                <div className="progress-line">
+                  <span style={{ width: `${course.progress_percent}%` }} />
+                </div>
+                <div className="course-footer">
+                  <span>
+                    <Clock size={16} />
+                    {course.duration_minutes} мин.
+                  </span>
+                  <span>
+                    {course.completed_tasks}/{formatTaskCount(course.total_tasks)}
+                  </span>
+                </div>
+                <Link className="secondary-button" to={`/courses/${course.id}`}>
+                  Открыть
+                  <ArrowRight size={18} />
+                </Link>
+              </article>
+            ))
+          ) : (
+            <div className="empty-state">
+              <GraduationCap size={24} />
+              <strong>Курсов пока нет</strong>
+              <span>Когда преподаватель добавит курс, он появится в этом разделе.</span>
+            </div>
+          )}
         </div>
       </section>
 
