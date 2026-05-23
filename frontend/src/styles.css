@@ -1507,6 +1507,11 @@ select {
   cursor: pointer;
 }
 
+.file-picker.compact {
+  width: 46px;
+  padding: 0;
+}
+
 .file-picker:has(input:disabled) {
   cursor: wait;
   opacity: 0.68;

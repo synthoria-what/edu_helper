@@ -925,10 +925,10 @@ function ImageUrlUploadField({
           <Image size={16} />
           <input value={imageUrl} onChange={(event) => onChange(event.target.value)} />
         </span>
-        <label className="file-picker">
+        <label className="file-picker compact" title={isUploading ? "Загружаем..." : "Загрузить картинку"}>
           <Upload size={18} />
-          <span>{isUploading ? "Загружаем..." : "Файл"}</span>
           <input
+            aria-label="Загрузить картинку"
             accept="image/gif,image/jpeg,image/png,image/webp"
             disabled={isUploading}
             type="file"
