@@ -126,23 +126,27 @@ export function ProfilePage() {
       </section>
 
       <section className="profile-grid profile-grid--history">
-        <CourseList title="Мои курсы" icon={<BookOpen size={20} />} courses={createdCourses} />
-        <CourseList title="Я прохожу" icon={<BookOpen size={20} />} courses={enrolledCourses} />
-        <CourseList title="Пройденные" icon={<Award size={20} />} courses={completedCourses} />
-        <TaskList tasks={completedTasks} showStudent={user?.role !== "student"} />
-        <div className="teacher-panel">
-          <div className="panel-title">
-            <Award size={20} />
-            <h2>Сертификаты</h2>
+        <div className="profile-history-column">
+          <CourseList title="Мои курсы" icon={<BookOpen size={20} />} courses={createdCourses} />
+          <CourseList title="Пройденные" icon={<Award size={20} />} courses={completedCourses} />
+          <div className="teacher-panel">
+            <div className="panel-title">
+              <Award size={20} />
+              <h2>Сертификаты</h2>
+            </div>
+            <div className="history-list">
+              {certificates.length ? certificates.map((certificate) => (
+                <Link className="history-item" to={`/courses/${certificate.course_id}/certificate`} key={certificate.id}>
+                  <strong>{certificate.course_title}</strong>
+                  <span>{certificate.code}</span>
+                </Link>
+              )) : <p className="helper-text">Сертификатов пока нет.</p>}
+            </div>
           </div>
-          <div className="history-list">
-            {certificates.length ? certificates.map((certificate) => (
-              <Link className="history-item" to={`/courses/${certificate.course_id}/certificate`} key={certificate.id}>
-                <strong>{certificate.course_title}</strong>
-                <span>{certificate.code}</span>
-              </Link>
-            )) : <p className="helper-text">Сертификатов пока нет.</p>}
-          </div>
+        </div>
+        <div className="profile-history-column">
+          <CourseList title="Я прохожу" icon={<BookOpen size={20} />} courses={enrolledCourses} />
+          <TaskList tasks={completedTasks} showStudent={user?.role !== "student"} />
         </div>
       </section>
     </Layout>

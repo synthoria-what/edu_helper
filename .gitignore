@@ -6,6 +6,9 @@ backend/.venv/
 backend/.env
 uploads/
 
+.venv/
+screenshots/
+
 # Node
 frontend/node_modules/
 frontend/dist/

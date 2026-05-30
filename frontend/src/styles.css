@@ -549,7 +549,7 @@ select {
 }
 
 .course-meta {
-  grid-template-columns: minmax(0, 1fr) max-content max-content;
+  grid-template-columns: minmax(0, 1fr) max-content;
 }
 
 .course-footer {
@@ -2109,7 +2109,7 @@ select {
 
 .course-search-panel {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) 132px 170px 138px max-content max-content;
+  grid-template-columns: minmax(240px, 1fr) 190px 150px max-content max-content;
   gap: 10px;
   align-items: center;
   margin-bottom: 22px;
@@ -2153,33 +2153,16 @@ select {
   padding: 0;
 }
 
-.rich-size-select {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: #60706d;
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.rich-size-select select {
-  width: 112px;
-}
-
 .rich-image-picker input {
   display: none;
 }
 
 .course-search-panel select:nth-of-type(1) {
-  width: 132px;
+  width: 190px;
 }
 
 .course-search-panel select:nth-of-type(2) {
-  width: 170px;
-}
-
-.course-search-panel select:nth-of-type(3) {
-  width: 138px;
+  width: 150px;
 }
 
 .search-input {
@@ -2341,6 +2324,13 @@ select {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.profile-history-column {
+  display: grid;
+  align-content: start;
+  gap: 24px;
+  min-width: 0;
+}
+
 .profile-grid--history .teacher-panel {
   min-width: 0;
 }
@@ -2389,6 +2379,14 @@ select {
 .course-directions-list label {
   min-height: 40px;
   padding: 8px 10px;
+}
+
+.course-level-select {
+  align-self: start;
+}
+
+.course-level-select select {
+  height: 46px;
 }
 
 .rich-content img,

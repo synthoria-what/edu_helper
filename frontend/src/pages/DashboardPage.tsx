@@ -4,7 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { api } from "../api";
 import { Layout } from "../components/Layout";
-import { formatCoursePrice, formatTaskCount } from "../format";
+import { formatTaskCount } from "../format";
 import type { CourseListItem, ProgressSummary } from "../types";
 
 const COURSES_PER_PAGE = 9;
@@ -19,16 +19,14 @@ export function DashboardPage() {
   const [courses, setCourses] = useState<CourseListItem[]>([]);
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
   const [query, setQuery] = useState("");
-  const [priceFilter, setPriceFilter] = useState("");
   const [directionFilter, setDirectionFilter] = useState("");
   const [levelFilter, setLevelFilter] = useState("");
   const [page, setPage] = useState(1);
   const [error, setError] = useState("");
 
   async function loadDashboard(
-    filters: { q?: string; price?: string; direction?: string; level?: string; owner_id?: string } = {
+    filters: { q?: string; direction?: string; level?: string; owner_id?: string } = {
       q: query,
-      price: priceFilter,
       direction: directionFilter,
       level: levelFilter,
       owner_id: ownerId,
@@ -44,7 +42,7 @@ export function DashboardPage() {
   }
 
   useEffect(() => {
-    void loadDashboard({ q: "", price: "", direction: "", level: "", owner_id: ownerId });
+    void loadDashboard({ q: "", direction: "", level: "", owner_id: ownerId });
   }, [searchParams]);
 
   const directions = useMemo(
@@ -65,10 +63,9 @@ export function DashboardPage() {
 
   function resetFilters() {
     setQuery("");
-    setPriceFilter("");
     setDirectionFilter("");
     setLevelFilter("");
-    void loadDashboard({ q: "", price: "", direction: "", level: "", owner_id: ownerId });
+    void loadDashboard({ q: "", direction: "", level: "", owner_id: ownerId });
   }
 
   return (
@@ -102,11 +99,6 @@ export function DashboardPage() {
             <Search size={18} />
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Название курса, автор или предмет" />
           </label>
-          <select value={priceFilter} onChange={(event) => setPriceFilter(event.target.value)}>
-            <option value="">Любая цена</option>
-            <option value="free">Бесплатные</option>
-            <option value="paid">Платные</option>
-          </select>
           <select value={directionFilter} onChange={(event) => setDirectionFilter(event.target.value)}>
             <option value="">Все направления</option>
             {directions.map((direction) => <option key={direction} value={direction}>{direction}</option>)}
@@ -135,7 +127,6 @@ export function DashboardPage() {
                 <div className="course-meta">
                   <span>{course.direction}</span>
                   <span>{course.level}</span>
-                  <span>{formatCoursePrice(course.price_rubles)}</span>
                 </div>
                 <h3>{course.title}</h3>
                 <small className="course-author">{course.owner_name}</small>

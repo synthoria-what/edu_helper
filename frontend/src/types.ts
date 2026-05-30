@@ -55,7 +55,6 @@ export type CourseListItem = {
   direction: string;
   level: string;
   duration_minutes: number;
-  price_rubles: number;
   image_url: string | null;
   owner_name: string;
   lessons_count: number;
@@ -110,7 +109,6 @@ export type CourseMutation = {
   direction: string;
   level: string;
   duration_minutes: number;
-  price_rubles: number;
   image_url?: string | null;
 };
 
