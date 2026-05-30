@@ -17,7 +17,7 @@ type InteractiveTaskProps = {
 
 export function InteractiveTask({ task, onSolved }: InteractiveTaskProps) {
   const [answer, setAnswer] = useState(task.result?.answer ?? "");
-  const [selectedOptions, setSelectedOptions] = useState<string[]>(() => (task.result?.answer ? task.result.answer.split("|") : []));
+  const [selectedOptions, setSelectedOptions] = useState<string[]>(() => splitMultiAnswer(task.result?.answer));
   const [orderedItems, setOrderedItems] = useState<string[]>(() => {
     const rawItems = task.payload.items;
     return Array.isArray(rawItems) ? shuffleItems(rawItems.map(String)) : [];
@@ -51,6 +51,11 @@ export function InteractiveTask({ task, onSolved }: InteractiveTaskProps) {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  function submitSelectedOptions() {
+    const nextAnswer = options.filter((option) => selectedOptions.includes(option)).join("|");
+    void submit(nextAnswer);
   }
 
   const isCorrect = task.result?.is_correct || status.startsWith("Верно");
@@ -154,9 +159,12 @@ export function InteractiveTask({ task, onSolved }: InteractiveTaskProps) {
                   key={`${option}-${index}`}
                   type="button"
                   onClick={() => {
-                    setSelectedOptions((current) =>
-                      current.includes(option) ? current.filter((item) => item !== option) : [...current, option],
-                    );
+                    setSelectedOptions((current) => {
+                      const nextSelected = current.includes(option)
+                        ? current.filter((item) => item !== option)
+                        : [...current, option];
+                      return options.filter((item) => nextSelected.includes(item));
+                    });
                   }}
                 >
                   {option}
@@ -164,7 +172,7 @@ export function InteractiveTask({ task, onSolved }: InteractiveTaskProps) {
               );
             })}
           </div>
-          <button className="primary-button" type="button" disabled={isSubmitting || !selectedOptions.length} onClick={() => void submit(selectedOptions.join("|"))}>
+          <button className="primary-button" type="button" disabled={isSubmitting || !selectedOptions.length} onClick={submitSelectedOptions}>
             <Send size={18} />
             Отправить
           </button>
@@ -219,6 +227,10 @@ function shuffleItems<T>(items: T[]): T[] {
     [result[index], result[randomIndex]] = [result[randomIndex], result[index]];
   }
   return result;
+}
+
+function splitMultiAnswer(value: string | null | undefined): string[] {
+  return (value ?? "").split("|").map((item) => item.trim()).filter(Boolean);
 }
 
 function AnswerForm({

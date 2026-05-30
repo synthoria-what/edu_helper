@@ -94,17 +94,35 @@ def normalize_answer_list(values: list[str]) -> list[str]:
     return sorted(normalize_answer(value) for value in values if value.strip())
 
 
+def split_compound_answer(value: str) -> list[str]:
+    return [item.strip() for item in value.split("|") if item.strip()]
+
+
+def normalize_text_items(values: list[str]) -> list[str]:
+    normalized: list[str] = []
+    for value in values:
+        item = str(value).strip()
+        if item and item not in normalized:
+            normalized.append(item)
+    return normalized
+
+
+def get_multi_choice_expected(task: Task) -> list[str]:
+    correct_answer_parts = split_compound_answer(task.correct_answer)
+    payload_answers = task.payload.get("correct_answers")
+    if isinstance(payload_answers, list) and "|" not in task.correct_answer:
+        return normalize_text_items([str(item) for item in payload_answers])
+    return normalize_text_items(correct_answer_parts)
+
+
 def answer_is_correct(task: Task, answer: str) -> bool:
     if task.type == TaskType.multi_choice:
-        expected = task.payload.get("correct_answers")
-        if not isinstance(expected, list):
-            expected = task.correct_answer.split("|")
-        return normalize_answer_list(answer.split("|")) == normalize_answer_list([str(item) for item in expected])
+        return normalize_answer_list(split_compound_answer(answer)) == normalize_answer_list(get_multi_choice_expected(task))
     if task.type == TaskType.order:
         expected = task.payload.get("items")
         if not isinstance(expected, list):
-            expected = task.correct_answer.split("|")
-        return [normalize_answer(item) for item in answer.split("|")] == [
+            expected = split_compound_answer(task.correct_answer)
+        return [normalize_answer(item) for item in split_compound_answer(answer)] == [
             normalize_answer(str(item)) for item in expected if str(item).strip()
         ]
     return normalize_answer(answer) == normalize_answer(task.correct_answer)
@@ -113,17 +131,22 @@ def answer_is_correct(task: Task, answer: str) -> bool:
 def normalize_task_payload(payload: TaskMutation) -> dict:
     data = payload.model_dump()
     if payload.type == TaskType.multi_choice:
-        correct_answers = data["payload"].get("correct_answers")
-        if not isinstance(correct_answers, list):
-            correct_answers = data["correct_answer"].split("|")
-        normalized = [str(item).strip() for item in correct_answers if str(item).strip()]
+        payload_answers = data["payload"].get("correct_answers")
+        correct_answer_parts = split_compound_answer(data["correct_answer"])
+        if correct_answer_parts and ("|" in data["correct_answer"] or not isinstance(payload_answers, list)):
+            correct_answers = correct_answer_parts
+        elif isinstance(payload_answers, list):
+            correct_answers = [str(item) for item in payload_answers]
+        else:
+            correct_answers = correct_answer_parts
+        normalized = normalize_text_items(correct_answers)
         data["payload"] = {**data["payload"], "correct_answers": normalized}
         data["correct_answer"] = "|".join(normalized)
     elif payload.type == TaskType.order:
         items = data["payload"].get("items")
         if not isinstance(items, list):
-            items = data["correct_answer"].split("|")
-        normalized = [str(item).strip() for item in items if str(item).strip()]
+            items = split_compound_answer(data["correct_answer"])
+        normalized = normalize_text_items(items)
         data["payload"] = {**data["payload"], "items": normalized}
         data["correct_answer"] = "|".join(normalized)
     return data

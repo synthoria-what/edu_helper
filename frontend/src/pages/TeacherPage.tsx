@@ -986,12 +986,14 @@ function normalizeLesson(payload: LessonMutation): LessonMutation {
 
 function normalizeTask(payload: TaskMutation): TaskMutation {
   if (payload.type === "multi_choice") {
-    const correctAnswers = Array.isArray(payload.payload.correct_answers)
-      ? payload.payload.correct_answers.map(String).filter(Boolean)
-      : payload.correct_answer.split("|").filter(Boolean);
+    const options = getOptions(payload).map((option) => option.trim()).filter(Boolean);
+    const correctAnswers = payload.correct_answer
+      .split("|")
+      .map((answer) => answer.trim())
+      .filter((answer) => answer && options.includes(answer));
     return {
       ...payload,
-      payload: { ...payload.payload, correct_answers: correctAnswers },
+      payload: { ...payload.payload, options, correct_answers: correctAnswers },
       correct_answer: correctAnswers.join("|"),
       image_url: payload.image_url?.trim() || null,
     };
@@ -1873,10 +1875,17 @@ function TaskPayloadFields({
             value={option}
             onChange={(event) => {
               const nextOptions = options.map((item, itemIndex) => (itemIndex === index ? event.target.value : item));
+              const nextCorrectAnswers = correctAnswers
+                .map((item) => (item === option ? event.target.value : item))
+                .filter((item) => nextOptions.includes(item));
               setTaskForm({
                 ...taskForm,
-                payload: { options: nextOptions },
-                correct_answer: taskForm.correct_answer === option ? event.target.value : taskForm.correct_answer,
+                payload: taskForm.type === "multi_choice"
+                  ? { ...taskForm.payload, options: nextOptions, correct_answers: nextCorrectAnswers }
+                  : { ...taskForm.payload, options: nextOptions },
+                correct_answer: taskForm.type === "multi_choice"
+                  ? nextCorrectAnswers.join("|")
+                  : taskForm.correct_answer === option ? event.target.value : taskForm.correct_answer,
               });
             }}
             placeholder={`Вариант ${index + 1}`}
@@ -1887,10 +1896,13 @@ function TaskPayloadFields({
             type="button"
             onClick={() => {
               const nextOptions = options.filter((_, itemIndex) => itemIndex !== index);
+              const nextCorrectAnswers = correctAnswers.filter((item) => nextOptions.includes(item));
               setTaskForm({
                 ...taskForm,
-                payload: { options: nextOptions },
-                correct_answer: nextOptions[0] ?? "",
+                payload: taskForm.type === "multi_choice"
+                  ? { ...taskForm.payload, options: nextOptions, correct_answers: nextCorrectAnswers }
+                  : { ...taskForm.payload, options: nextOptions },
+                correct_answer: taskForm.type === "multi_choice" ? nextCorrectAnswers.join("|") : nextOptions[0] ?? "",
               });
             }}
             title="Удалить вариант"
@@ -1905,7 +1917,7 @@ function TaskPayloadFields({
         onClick={() =>
           setTaskForm({
             ...taskForm,
-            payload: { options: [...options, `Вариант ${options.length + 1}`] },
+            payload: { ...taskForm.payload, options: [...options, `Вариант ${options.length + 1}`] },
           })
         }
       >
